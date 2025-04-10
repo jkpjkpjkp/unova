@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Iterator
-from sqlalchemy import create_engine, select, func, JSON, ForeignKey
+from sqlalchemy import create_engine, select, func, JSON, ForeignKey, String, Table, Column
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
 import polars as pl
 from PIL import Image
@@ -9,18 +9,21 @@ db_name = "experiment.db"
 
 class Base(DeclarativeBase):
     pass
+
 class Graph(Base):
     __tablename__ = "graphs"
     id: Mapped[int] = mapped_column(primary_key=True)
     graph: Mapped[str] = mapped_column(nullable=False)
     prompt: Mapped[str] = mapped_column(nullable=False)
     runs: Mapped[list["Run"]] = relationship(back_populates="graph")
+    tags: Mapped[List[str]] = mapped_column(JSON, nullable=True)
 
 class Task(Base):
     __tablename__ = "tasks"
     id: Mapped[int] = mapped_column(primary_key=True)
     task: Mapped[str] = mapped_column(nullable=False)
     runs: Mapped[list["Run"]] = relationship(back_populates="task")
+    tags: Mapped[List[str]] = mapped_column(JSON, nullable=True)
 
 class Run(Base):
     __tablename__ = "runs"
