@@ -5,6 +5,7 @@ from io import BytesIO
 df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
 
 print(df.head())
+print(df.row(0, named=True)['question_text'])
 
 def display_image():
     first_row = df.row(0, named=True)

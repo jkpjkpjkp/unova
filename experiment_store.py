@@ -1,38 +1,85 @@
 from typing import *
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, func, JSON, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
+import polars as pl
+from PIL import Image
+from io import BytesIO
+import re
+from image_shelve import MM, store
+db_name = "experiment.db"
 
 class Base(DeclarativeBase):
     pass
-
 class Graph(Base):
     __tablename__ = "graphs"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     graph: Mapped[str] = mapped_column(nullable=False)
     prompt: Mapped[str] = mapped_column(nullable=False)
     runs: Mapped[list["Run"]] = relationship(back_populates="graph")
-    
 
 class Task(Base):
     __tablename__ = "tasks"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     task: Mapped[str] = mapped_column(nullable=False)
     runs: Mapped[list["Run"]] = relationship(back_populates="task")
 
 class Run(Base):
     __tablename__ = "runs"
-
     id: Mapped[int] = mapped_column(primary_key=True)
+    graph_id: Mapped[int] = mapped_column(ForeignKey("graphs.id"))
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"))
+    locals: Mapped[dict] = mapped_column(JSON, nullable=True)
+    judge: Mapped[dict] = mapped_column(JSON, nullable=True)
+    correct: Mapped[bool] = mapped_column(nullable=False)
     graph: Mapped["Graph"] = relationship(back_populates="runs")
     task: Mapped["Task"] = relationship(back_populates="runs")
-    locals: Mapped[dict] = mapped_column(nullable=True)
-    judge: Mapped[dict] = mapped_column(nullable=True)
-    correct: Mapped[bool] = mapped_column(nullable=False)
+
+engine = create_engine(f"sqlite:///{db_name}")
+
+def import_parquet_tasks(path: str):
+    df = pl.read_parquet(path)
+    print(df.head())
+    with Session(engine) as session:
+        for row in df.iter_rows(named=True):
+            question = row['question_text']  # Adjust column name if different
+            images = [Image.open(BytesIO(img['bytes'])) for img in row['question_images_decoded']]
+            print(images)
+            images = ' '.join(store(images))
+            session.add(Task(task=images+question))
+        session.commit()
+
+def test_import_parquet_tasks():
+    import_parquet_tasks('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
+    with Session(engine) as session:
+        #print head
+        print(session.query(Task).limit(5).all())
 
 
-engine = create_engine("sqlite:///experiment.db")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def calc_win_rate(graph: Optional[Graph], task: Optional[Task]) -> float:
     with Session(engine) as session:
         if graph and task:
@@ -50,3 +97,60 @@ def calc_win_rate(graph: Optional[Graph], task: Optional[Task]) -> float:
         else:
             raise ValueError("No graph or task provided")
             
+test_import_parquet_tasks()
+
+
+
+###### UNDONE BELOW
+
+def get_all_graph_stats() -> List[Dict[str, Any]]:
+    """
+    Compute columnar statistics for all graphs: number of distinct tasks and average success rate.
+    
+    Returns:
+        List of dictionaries, each containing:
+        - graph_id (int): The ID of the graph.
+        - num_tasks (int): Number of distinct tasks run with the graph.
+        - avg_success_rate (float or None): Average success rate across tasks, or None if no tasks.
+    """
+    with Session(engine) as session:
+        # Subquery: Compute success rate (avg of correct) for each graph-task pair
+        subquery = (
+            select(
+                Run.graph_id,
+                Run.task_id,
+                func.avg(Run.correct).label('success_rate')
+            )
+            .group_by(Run.graph_id, Run.task_id)
+            .subquery()
+        )
+        
+        # Main query: Count distinct tasks and average success rates per graph
+        query = (
+            select(
+                Graph.id.label('graph_id'),
+                func.count(subquery.c.task_id).label('num_tasks'),
+                func.avg(subquery.c.success_rate).label('avg_success_rate')
+            )
+            .outerjoin(subquery, Graph.id == subquery.c.graph_id)
+            .group_by(Graph.id)
+        )
+        
+        # Execute and format results
+        results = session.execute(query).all()
+        return [
+            {
+                'graph_id': row.graph_id,
+                'num_tasks': row.num_tasks,
+                'avg_success_rate': row.avg_success_rate
+            }
+            for row in results
+        ]
+def test_get_all_graph_stats():
+    stats = get_all_graph_stats()
+
+    print("Graph ID | Num Tasks | Avg Success Rate")
+    print("---------|-----------|-----------------")
+    for stat in stats:
+        avg_rate = f"{stat['avg_success_rate']:.4f}" if stat['avg_success_rate'] is not None else "N/A"
+        print(f"{stat['graph_id']:8d} | {stat['num_tasks']:9d} | {avg_rate}")

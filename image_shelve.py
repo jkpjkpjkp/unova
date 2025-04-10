@@ -7,8 +7,9 @@ import base64
 import binascii
 import io
 import re
-short_hash_to_image = shelve.open('image.shelve')
+import openai
 
+short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')
 
 tot = len(long_hash_to_short_hash.keys())
@@ -25,8 +26,10 @@ def int_to_base62(i):
     while i:
         s = chars[i % 62] + s
         i //= 62
+    return s
 
 def store_image(image: Image.Image):
+    global tot
     long_hash = hashlib.sha256(image.tobytes()).hexdigest()
     if long_hash not in long_hash_to_short_hash:
         with tot_lock:
@@ -37,13 +40,20 @@ def store_image(image: Image.Image):
         short_hash_to_image[short_hash] = image
     return long_hash_to_short_hash[long_hash]
 
-def get_image_by_long_hash(long_hash):
-    return short_hash_to_image[long_hash_to_short_hash[long_hash]]
-
-
 pretty = '<image_{short_hash}>'
 def pretty_encode(image: Image.Image):
     return pretty.format(short_hash=store_image(image))
+
+def store(content):
+    if isinstance(content, Image.Image):
+        return pretty_encode(content)
+    elif isinstance(content, dict):
+        return {k: store(v) for k, v in content.items()}
+    elif isinstance(content, Iterable):
+        return [store(item) for item in content]
+    else:
+        raise ValueError(f"Cannot store {type(content)}")
+    
 
 class MultimodalMessage:
     def __init__(self, content: Optional[Union[str, Image.Image, List[Union[str, Image.Image]]]] = None):
@@ -99,8 +109,7 @@ def recursively_find_image(x: Any):
 
 
 def detach_image_from_text(x: str) -> MM:
-    pattern = r'<image_([a-zA-Z0-9]{1,10}?)>'
-    parts = re.split(pattern, x)
+    parts = re.split(r'<image_([a-zA-Z0-9]{1,10}?)>', x)
     return MM([
         get_image_by_short_hash(x) if i % 2 == 1 else x.strip()
         for i, x in enumerate(parts)
@@ -116,3 +125,30 @@ def recursively_restore_image(x: Any):
     return x
 
 
+###### UNDONE BELOW
+
+def call_openai(x: str):
+    parts = re.split(r'<image_([a-zA-Z0-9]{1,10}?)>', x)
+    content = []
+    
+    for i, part in enumerate(parts):
+        if i % 2 == 0:
+            if part.strip():
+                content.append({"type": "text", "text": part})
+        else:
+            buffered = io.BytesIO()
+            get_image_by_short_hash(part).save(buffered, format="PNG")
+            base64_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{base64_data}"}
+            })
+    
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=content,
+        response_format={"type": "json_object"},
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url=os.getenv("OPENAI_BASE_URL")
+    )
+    return response.choices[0].message.content
