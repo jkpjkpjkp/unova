@@ -8,6 +8,9 @@ import binascii
 import io
 import re
 import openai
+import os
+
+model = "gpt-4o-mini"
 
 short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')
@@ -125,8 +128,6 @@ def recursively_restore_image(x: Any):
     return x
 
 
-###### UNDONE BELOW
-
 def call_openai(x: str):
     parts = re.split(r'<image_([a-zA-Z0-9]{1,10}?)>', x)
     content = []
@@ -145,9 +146,8 @@ def call_openai(x: str):
             })
     
     response = openai.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=content,
-        response_format={"type": "json_object"},
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("OPENAI_BASE_URL")
     )

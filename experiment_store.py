@@ -36,16 +36,22 @@ class Run(Base):
 
 engine = create_engine(f"sqlite:///{db_name}")
 
+
+###### UNDONE BELOW
+
 def import_parquet_tasks(path: str):
     df = pl.read_parquet(path)
-    print(df.head())
     with Session(engine) as session:
+        existing_tasks = {task.task for task in session.query(Task.task).all()}
         for row in df.iter_rows(named=True):
             question = row['question_text']  # Adjust column name if different
             images = [Image.open(BytesIO(img['bytes'])) for img in row['question_images_decoded']]
-            print(images)
-            images = ' '.join(store(images))
-            session.add(Task(task=images+question))
+            images_str = ' '.join(store(images))
+            task_str = images_str + question
+            if task_str in existing_tasks:
+                continue
+            session.add(Task(task=task_str))
+            existing_tasks.add(task_str)  # Update the set with the new task
         session.commit()
 
 def test_import_parquet_tasks():
