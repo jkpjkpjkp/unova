@@ -17,7 +17,7 @@ class Graph:
         self.custom = operators['Custom']
         self.prompt_custom = prompt_custom # Contains LOCATE_PROMPT, VQA_PROMPT, REFINE_VQA_PROMPT
 
-    async def run(self, problem: str) -> dict:
+    async def run(self, problem: str) -> str:
         """
         Answers the visual question using a locate-VQA-refine pipeline.
         1. Identify relevant area/objects.
@@ -49,6 +49,6 @@ class Graph:
         # Ensure final response is not None
         final_answer = final_response_dict.get('response', "Unable to provide a final answer after refinement.")
 
-        return {'response': final_answer}
+        return final_answer
 
 

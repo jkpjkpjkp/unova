@@ -17,3 +17,13 @@ Here is a workflow in the form of python code that correctly answered a task how
 
 Here are 2 workflows and their trajectories on two tasks respectively. each workflow got a different task right and your task is to analyze their strengths and weaknesses to come up with a workflow combining their strengths and get both tasks right, without, of course, giving out answers or task specific hints but be generally applicable to other tasks of the same kind. 
 """
+
+
+"""hard task
+
+for extremely hard tasks measures must be taken such that
+
+0. it speculates which step is incorret
+1. llm guesses its trail to correct answer.
+2. ()
+"""

@@ -9,7 +9,7 @@ import io
 import re
 import openai
 import os
-
+import argparse
 model = "gpt-4o-mini"
 
 short_hash_to_image = shelve.open('image.shelve')
@@ -34,7 +34,8 @@ def int_to_base62(i):
 def store_image(image: Image.Image):
     global tot
     long_hash = hashlib.sha256(image.tobytes()).hexdigest()
-    if long_hash not in long_hash_to_short_hash:
+    print(long_hash)
+    if long_hash not in long_hash_to_short_hash or not long_hash_to_short_hash[long_hash]:
         with tot_lock:
             tot += 1
             local_tot = tot
@@ -45,7 +46,9 @@ def store_image(image: Image.Image):
 
 pretty = '<image_{short_hash}>'
 def pretty_encode(image: Image.Image):
-    return pretty.format(short_hash=store_image(image))
+    short_hash = store_image(image)
+    print(image, short_hash)
+    return pretty.format(short_hash=short_hash)
 
 def store(content):
     if isinstance(content, Image.Image):
@@ -148,7 +151,14 @@ def call_openai(x: str):
     response = openai.chat.completions.create(
         model=model,
         messages=content,
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("OPENAI_BASE_URL")
+        api_key=os.getenv("LOCAL_API_KEY"),
+        base_url=os.getenv("LOCAL_BASE_URL")
     )
     return response.choices[0].message.content
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image_path", type=str, required=True)
+    args = parser.parse_args()
+    image = Image.open(args.image_path)
+    print(pretty_encode(image))

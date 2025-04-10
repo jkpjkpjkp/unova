@@ -10,16 +10,15 @@ import functools
 import sys
 from pydantic import BaseModel, Field
 from image_shelve import call_openai
+import os
+from experiment_store import Graph, Task, all_tasks, log_experiment, calc_win_rate
+from tqdm import tqdm
+import asyncio
 
-
-###### UNDONE BELOW
-
-async def operator_custom(input, instruction, mode: Literal["single_fill", "xml_fill", "code_fill"] = "single_fill"):
+async def operator_custom(input, instruction):
     prompt = instruction + input
     response = await call_openai(prompt)
     return response
-
-###### UNDONE ABOVE
 
 
 operators_dict = {
@@ -52,8 +51,36 @@ def extract_local_variables(func):
     return wrapper
 
 def extract_graph_by_exec(graph_code: str, prompt_code: str):
+    graph_code += '\n' + prompt_code
     namespace = {}
     exec(graph_code, namespace)
     Graph = namespace.get("Graph")
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
+
+
+def conduct_experiment(graph: Graph, task: Task):
+    graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
+    output, localvar = asyncio.run(graph_executable(task.task))
+    answer = re.findall(r'<boxed>(.*?)</boxed>', output)[-1]
+    log_experiment(graph.id, task.id, localvar, output, answer)
+    return answer == task.answer
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--graph_dir", type=str, required=True)
+    args = parser.parse_args()
+
+    with open(os.path.join(args.graph_dir, 'graph.py'), 'r') as f:
+        graph_code = f.read()
+    with open(os.path.join(args.graph_dir, 'prompt.py'), 'r') as f:
+        prompt_code = f.read()
+
+    graph = Graph(prompt=prompt_code, graph=graph_code)
+    tasks = all_tasks()
+    print(len(tasks), 'tasks')
+    for task in tqdm(tasks):
+        conduct_experiment(graph, task)
+
+    print(calc_win_rate(graph=graph))

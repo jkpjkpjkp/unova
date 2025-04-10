@@ -35,7 +35,7 @@ class Run(Base):
     task: Mapped["Task"] = relationship(back_populates="runs")
 
 engine = create_engine(f"sqlite:///{db_name}")
-
+Base.metadata.create_all(engine)
 
 ###### UNDONE BELOW
 
@@ -57,14 +57,28 @@ def import_parquet_tasks(path: str):
 def test_import_parquet_tasks():
     import_parquet_tasks('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
     with Session(engine) as session:
-        #print head
-        print(session.query(Task).limit(5).all())
+        # Print first 5 tasks
+        tasks = session.query(Task).limit(5).all()
+        print("First 5 tasks:")
+        for task in tasks:
+            print(task.task)
+        
+        # Check total number of tasks
+        total_tasks = session.query(Task).count()
+        print(f"Total tasks in database: {total_tasks}")
 
 
+test_import_parquet_tasks()
 
 
+def all_tasks() -> Iterator[Task]:
+    with Session(engine) as session:
+        return session.query(Task).all()
 
-
+def log_experiment(graph_id: int, task_id: int, localvar: dict, output: str, answer: str):
+    with Session(engine) as session:
+        session.add(Run(graph_id=graph_id, task_id=task_id, locals=localvar, output=output, answer=answer, correct=(answer == answer)))
+        session.commit()
 
 
 
@@ -103,7 +117,6 @@ def calc_win_rate(graph: Optional[Graph], task: Optional[Task]) -> float:
         else:
             raise ValueError("No graph or task provided")
             
-test_import_parquet_tasks()
 
 
 
