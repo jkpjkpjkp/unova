@@ -10,7 +10,6 @@ Provide only the final, refined answer, including any necessary explanation for 
 
 Initial Answer is provided in the input context."""
 
-import asyncio
 
 class Graph:
     def __init__(self, operators: dict, prompt_custom: object):

@@ -5,10 +5,8 @@ takes in files (code text) and returns executable
 
 
 import re
-from typing import List, Literal
 import functools
 import sys
-from pydantic import BaseModel, Field
 from image_shelve import call_openai
 import os
 from experiment_store import Graph, Task, all_tasks, log_experiment, calc_win_rate

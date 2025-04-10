@@ -1,11 +1,10 @@
-from typing import *
+from typing import Any, Dict, List, Optional, Iterator
 from sqlalchemy import create_engine, select, func, JSON, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
 import polars as pl
 from PIL import Image
 from io import BytesIO
-import re
-from image_shelve import MM, store
+from image_shelve import store
 db_name = "experiment.db"
 
 class Base(DeclarativeBase):
@@ -37,8 +36,6 @@ class Run(Base):
 engine = create_engine(f"sqlite:///{db_name}")
 Base.metadata.create_all(engine)
 
-###### UNDONE BELOW
-
 def import_parquet_tasks(path: str):
     df = pl.read_parquet(path)
     with Session(engine) as session:
@@ -57,7 +54,6 @@ def import_parquet_tasks(path: str):
 def test_import_parquet_tasks():
     import_parquet_tasks('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
     with Session(engine) as session:
-        # Print first 5 tasks
         tasks = session.query(Task).limit(5).all()
         print("First 5 tasks:")
         for task in tasks:
@@ -79,25 +75,6 @@ def log_experiment(graph_id: int, task_id: int, localvar: dict, output: str, ans
     with Session(engine) as session:
         session.add(Run(graph_id=graph_id, task_id=task_id, locals=localvar, output=output, answer=answer, correct=(answer == answer)))
         session.commit()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def calc_win_rate(graph: Optional[Graph], task: Optional[Task]) -> float:

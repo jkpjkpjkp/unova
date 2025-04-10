@@ -1,9 +1,8 @@
 
-from image_shelve import call_openai
 from pydantic import BaseModel
 
 def xml_call(input: str, output: BaseModel) -> dict:
-    import xml.etree.ElementTree as ET
+    pass
 
 """
 Here is a workflow in the form of python code and it got wrong on this particular task. please see his trajectory and the ground truth final answer and try to deduce which Step went wrong after so please refine the workflow so as to reach the correct answer of course you should not give the answer away or use any method that will not be generally applicable to other problems similar.
