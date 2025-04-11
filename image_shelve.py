@@ -112,7 +112,10 @@ def call_openai(x: str):
     
     return openai.chat.completions.create(
         model=model,
-        messages=content,
+        messages=[{
+            'role': 'user',
+            'content': content
+        }],
     ).choices[0].message.content
 
 if __name__ == "__main__":
