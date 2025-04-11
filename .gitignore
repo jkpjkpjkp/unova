@@ -11,4 +11,4 @@ wheels/
 
 db/
 *.shelve
-experiment.db
+*.db
