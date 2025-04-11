@@ -1,9 +1,4 @@
-from typing import Any, Dict, List, Optional, Iterator
-from sqlmodel import Field, SQLModel
-import polars as pl
-from PIL import Image
-from io import BytesIO
-from image_shelve import store
+from sqlmodel import Field, SQLModel, create_engine
 db_name = "main.db"
 
 class Graph(SQLModel, table=True):
@@ -21,3 +16,9 @@ class Run(SQLModel, table=True):
     task_id: int = Field(foreign_key="task.id")
     log: dict
     result: bool
+
+
+def init():
+    engine = create_engine(f"sqlite:///{db_name}")
+    SQLModel.metadata.create_all(engine)
+    
