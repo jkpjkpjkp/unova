@@ -36,7 +36,7 @@ class Run(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph_id: bytes = Field(foreign_key="graph.id")
     task_id: bytes = Field(foreign_key="task.id")
-    log_id: bytes
+    log_id: int
     correct: bool
 
     @property
@@ -60,27 +60,6 @@ def go(x):
         merged_x = session.merge(x)
         session.commit()
         session.refresh(merged_x)
-
-def graph_stat(x: Graph):
-    x.id = x.id or x.hash
-    with Session(engine) as session:
-        runs = session.exec(select(Run).where(Run.graph_id == x.id))
-        tasks = {}
-        for run in runs:
-            if run.task_id not in tasks:
-                tasks[run.task_id] = []
-            tasks[run.task_id].append(run)
-        correct = 0
-        for task in tasks:
-            correct += sum([run.correct for run in tasks[task]]) / len(tasks[task])
-        return correct, len(tasks)
-
-def task_stat(x: Task):
-    x.id = x.id or x.hash
-    with Session(engine) as session:
-        runs = session.exec(select(Run).where(Run.task_id == x.id))
-        return sum(map(lambda x: x.correct, runs)), len(runs)
-    
 
 
 
@@ -132,6 +111,16 @@ def test_read_task_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
+def log_experiment(graph_id: bytes, task_id: bytes, localvar: dict, output: str, answer: str):
+    from log_shelve import put
+    localvar['__OUTPUT__'] = output
+    localvar['__ANSWER__'] = answer
+    log_id = put(localvar)
+    with Session(engine) as session:
+        run = Run(graph_id=graph_id, task_id=task_id, log_id=log_id, correct=(answer == output))
+        session.add(run)
+        session.commit()
+
 if __name__ == "__main__":
     init()
-    test_read_task_from_a_parquet()
+    test_read_graph_from_a_folder()
