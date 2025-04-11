@@ -1,5 +1,6 @@
 from sqlmodel import Field, SQLModel, create_engine, Session, select
 import hashlib
+import os
 db_name = "main.db"
 
 class Graph(SQLModel, table=True):
@@ -89,9 +90,24 @@ def test_graph_insert():
     go(g)
     print(g.id)
 
+def read_graph_from_a_folder(folder: str):
+    graph_file = os.path.join(folder, "graph.py")
+    prompt_file = os.path.join(folder, "prompt.py")
+    with open(graph_file, "r") as f:
+        graph = f.read()
+    with open(prompt_file, "r") as f:
+        prompt = f.read()
+    graph = Graph(graph=graph, prompt=prompt)
+    go(graph)
 
+def test_read_graph_from_a_folder():
+    with Session(engine) as session:
+        print(len(session.exec(select(Graph)).all()))
+    read_graph_from_a_folder("sample/cot")
+    with Session(engine) as session:
+        print(len(session.exec(select(Graph)).all()))
 
 
 if __name__ == "__main__":
     init() # Initialize the database engine
-    test_graph_insert()
+    test_read_graph_from_a_folder()
