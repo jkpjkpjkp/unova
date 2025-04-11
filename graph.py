@@ -136,4 +136,5 @@ def test_pick_then_execute():
 
 if __name__ == "__main__":
     experiment_store.init()
-    test_pick_then_execute()
+    for _ in range(42):
+        test_pick_then_execute()

@@ -10,6 +10,7 @@ import re
 import openai
 import os
 import argparse
+import asyncio
 model = "gemini-2.0-pro-exp-02-05"
 
 short_hash_to_image = shelve.open('image.shelve')
@@ -91,7 +92,7 @@ def back(x):
         return x
 
 
-def call_openai(x: str):
+async def call_openai(x: str):
     parts = re.split(ugly, x)
     content = []
     for i, part in enumerate(parts):
@@ -103,6 +104,14 @@ def call_openai(x: str):
             img = get_image_by_short_hash(part)
             if not hasattr(img, 'filename'):
                 img.filename = ""
+
+            max_dim = 2000
+            if max(img.width, img.height) > max_dim:
+                scale = max_dim / max(img.width, img.height)
+                new_width = int(img.width * scale)
+                new_height = int(img.height * scale)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
             img.save(buffer, format="PNG")
             base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
             content.append({
