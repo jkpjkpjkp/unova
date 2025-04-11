@@ -9,7 +9,7 @@ import functools
 import sys
 from image_shelve import call_openai
 import os
-from experiment_store import Graph, Task, init, Run, log_experiment
+from experiment_store import Graph, Task, init, Run, log
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -30,24 +30,21 @@ def extract_graph_by_text(graph_load: str) -> str:
     pattern = re.compile(r"class Graph:.*?(?=^\S|\Z)", re.DOTALL | re.MULTILINE)
     return re.match(pattern, graph_load).group(0)
 
-
 def extract_local_variables(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        original_trace = sys.gettrace()
-
+        original = sys.gettrace()
         captured_locals = {}
-        def trace_func(frame, event, _arg):
+        def a(frame, event, _arg):
             if event == 'return' and frame.f_code is func.__code__:
                 nonlocal captured_locals
                 captured_locals = frame.f_locals
-            return trace_func
-        sys.settrace(trace_func)
-
+            return a
+        sys.settrace(a)
         try:
             result = await func(*args, **kwargs)
         finally:
-            sys.settrace(original_trace)
+            sys.settrace(original)
         return result, captured_locals
     return wrapper
 
@@ -59,33 +56,12 @@ def extract_graph_by_exec(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
-
 def conduct_experiment(graph: Graph, task: Task):
     graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
     output, localvar = asyncio.run(graph_executable(task.task))
-    answer = re.findall(r'<boxed>(.*?)</boxed>', output)[-1]
-    log_experiment(graph.id, task.id, localvar, output, answer)
+    answer = re.findall(r'\boxed{(.*?)}', output)[-1]
+    log(graph.id, task.id, localvar, output, answer)
     return answer == task.answer
-
-def graph_stat(x: Graph):
-    x.id = x.id or x.hash
-    with Session(experiment_store.engine) as session:
-        runs = session.exec(select(Run).where(Run.graph_id == x.id))
-        tasks = {}
-        for run in runs:
-            if run.task_id not in tasks:
-                tasks[run.task_id] = []
-            tasks[run.task_id].append(run)
-        correct = 0
-        for task in tasks:
-            correct += sum([run.correct for run in tasks[task]]) / len(tasks[task])
-        return correct, len(tasks)
-
-def task_stat(x: Task):
-    x.id = x.id or x.hash
-    with Session(experiment_store.engine) as session:
-        runs = session.exec(select(Run).where(Run.task_id == x.id))
-        return sum(map(lambda x: x.correct, runs)), len(runs)
 
 def let_us_pick() -> Tuple[Graph, Task]:
     import random

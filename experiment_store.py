@@ -117,7 +117,7 @@ def test_read_task_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
-def log_experiment(graph_id: bytes, task_id: bytes, localvar: dict, output: str, answer: str):
+def log(graph_id: bytes, task_id: bytes, localvar: dict, output: str, answer: str):
     from log_shelve import put
     localvar['__OUTPUT__'] = output
     localvar['__ANSWER__'] = answer

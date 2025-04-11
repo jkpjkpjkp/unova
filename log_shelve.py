@@ -1,14 +1,5 @@
 import shelve
-from PIL import Image
-import hashlib
 from multiprocessing import Lock
-from typing import Any, Iterable, Optional, Union, List
-import base64
-import binascii
-import io
-import re
-import os
-import argparse
 
 log_shelve = shelve.open('log.shelve')
 tot = len(log_shelve.keys())
