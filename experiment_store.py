@@ -1,4 +1,4 @@
-from sqlmodel import Field, SQLModel, create_engine, Session, select
+from sqlmodel import Field, SQLModel, create_engine, Session, select, delete
 import hashlib
 import os
 from image_shelve import go as img_go
@@ -69,7 +69,7 @@ def test_graph_insert():
     go(g)
     print(g.id)
 
-def read_graph_from_a_folder(folder: str):
+def DANGER_DANGER_DANGER_read_graph_from_a_folder(folder: str):
     graph_file = os.path.join(folder, "graph.py")
     prompt_file = os.path.join(folder, "prompt.py")
     with open(graph_file, "r") as f:
@@ -77,12 +77,18 @@ def read_graph_from_a_folder(folder: str):
     with open(prompt_file, "r") as f:
         prompt = f.read()
     graph = Graph(graph=graph, prompt=prompt)
+
+    # remove all graphs in db
+    with Session(engine) as session:
+        session.exec(delete(Graph))
+        session.commit()
+
     go(graph)
 
-def test_read_graph_from_a_folder():
+def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
-    read_graph_from_a_folder("sample/cot")
+    DANGER_DANGER_DANGER_read_graph_from_a_folder("sample/cot")
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
 
@@ -123,4 +129,4 @@ def log_experiment(graph_id: bytes, task_id: bytes, localvar: dict, output: str,
 
 if __name__ == "__main__":
     init()
-    test_read_graph_from_a_folder()
+    DANGER_DANGER_DANGER_test_read_graph_from_a_folder()

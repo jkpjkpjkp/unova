@@ -10,7 +10,7 @@ import re
 import openai
 import os
 import argparse
-model = "gpt-4o-mini"
+model = "gemini-2.0-pro-exp-02-05"
 
 short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')
@@ -100,7 +100,10 @@ def call_openai(x: str):
                 content.append({"type": "text", "text": part})
         else:
             buffer = io.BytesIO()
-            get_image_by_short_hash(part).save(buffer, format="PNG")
+            img = get_image_by_short_hash(part)
+            if not hasattr(img, 'filename'):
+                img.filename = ""
+            img.save(buffer, format="PNG")
             base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
             content.append({
                 "type": "image_url",
@@ -110,8 +113,6 @@ def call_openai(x: str):
     return openai.chat.completions.create(
         model=model,
         messages=content,
-        api_key=os.getenv("LOCAL_API_KEY"),
-        base_url=os.getenv("LOCAL_BASE_URL")
     ).choices[0].message.content
 
 if __name__ == "__main__":
