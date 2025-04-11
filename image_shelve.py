@@ -64,10 +64,12 @@ def go(x: Any):
         return img_go(x)
     elif isinstance(x, str):
         return str_go(x)
+    elif isinstance(x, bytes):
+        return img_go(Image.open(io.BytesIO(x)))
     elif isinstance(x, dict):
-        return map(go, x.values())
+        return {k: go(v) for k, v in x.items()}
     elif isinstance(x, Iterable):
-        return map(go, x)
+        return [go(v) for v in x]
     else:
         return x
 

@@ -1,6 +1,7 @@
 from sqlmodel import Field, SQLModel, create_engine, Session, select
 import hashlib
 import os
+from image_shelve import go as img_go
 db_name = "main.db"
 
 class Graph(SQLModel, table=True):
@@ -84,7 +85,6 @@ def task_stat(x: Task):
 
 
 
-
 def test_graph_insert():
     g = Graph(graph="import hi", prompt="LO = 'avavav'")
     go(g)
@@ -108,6 +108,30 @@ def test_read_graph_from_a_folder():
         print(len(session.exec(select(Graph)).all()))
 
 
+def read_task_from_a_parquet(filepath: str):
+    import polars as pl
+    from tqdm import tqdm
+    from loguru import logger
+    df = pl.read_parquet(filepath)
+    for row in tqdm(df.iter_rows(named=True)):
+        images = [x['bytes'] for x in row["question_images_decoded"]]
+        images = img_go(images)
+        if isinstance(images, list):
+            images = ' '.join(images)
+        try:
+            task = Task(task=images + ' ' + row["question_text"], answer=float(row["question_answer"]))
+        except ValueError:
+            logger.warning(f"Error parsing {row['question_text']} {row['question_answer']}")
+            continue
+        go(task)
+
+def test_read_task_from_a_parquet():
+    with Session(engine) as session:
+        print(len(session.exec(select(Task)).all()))
+    read_task_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet")
+    with Session(engine) as session:
+        print(len(session.exec(select(Task)).all()))
+
 if __name__ == "__main__":
-    init() # Initialize the database engine
-    test_read_graph_from_a_folder()
+    init()
+    test_read_task_from_a_parquet()
