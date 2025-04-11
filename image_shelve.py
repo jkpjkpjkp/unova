@@ -93,6 +93,7 @@ def back(x):
 
 
 async def call_openai(x: str):
+    # HANGING: duplicate reference to image, in logs. 
     parts = re.split(ugly, x)
     content = []
     for i, part in enumerate(parts):

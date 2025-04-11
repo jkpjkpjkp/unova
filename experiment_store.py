@@ -11,8 +11,6 @@ class Graph(SQLModel, table=True):
 
     @property
     def hash(self):
-        if self.id:
-            return self.id
         self.graph = self.graph.strip(' \n')
         self.prompt = self.prompt.strip(' \n')
         code = self.graph + '\n' + self.prompt
@@ -26,8 +24,6 @@ class Task(SQLModel, table=True):
 
     @property
     def hash(self):
-        if self.id:
-            return self.id
         code = self.task + f"\\boxed{{{self.answer}}}"
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
@@ -41,11 +37,22 @@ class Run(SQLModel, table=True):
 
     @property
     def hash(self):
-        if self.id:
-            return self.id
         code = str(self.graph_id) + '\n' + str(self.task_id) + '\n' + str(self.log_id) + '\n' + str(self.correct)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
+
+class Optim(SQLModel, table=True):
+    id: bytes = Field(primary_key=True)
+    runs: list[bytes] = Field(foreign_key="run.id")
+    child: bytes = Field(foreign_key="graph.id")
+    log_id: int
+
+    @property
+    def hash(self):
+        code = str(self.runs) + '\n' + str(self.child) + '\n' + str(self.log_id)
+        self.id = hashlib.sha256(code.encode('utf-8')).digest()
+        return self.id
+
 
 engine = None
 
