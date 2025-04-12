@@ -15,7 +15,7 @@ import asyncio
 from sqlmodel import Session, select
 from typing import Tuple
 import random
-
+import math
 async def operator_custom(input, instruction):
     prompt = instruction + input
     response = await callopenai(prompt)
@@ -124,11 +124,41 @@ def xml_extract(str) -> dict:
     return {child.tag: child.text for child in root}
 
 def ron_(opti: Opti, runs: list[Run]):
-    graph_executable = extract_graph_by_exec(opti.graph, opti.prompt)
-    output, localvar = asyncio.run(graph_executable(runs))
-    print(output)
-    graph_id = go()
-    go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), correct=output == runs[0].task.answer))
+    opti_executable = extract_graph_by_exec(opti.graph, opti.prompt)
+    output, localvar = asyncio.run(opti_executable(runs))
+    o_dic = xml_extract(output)
+    new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
+    go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
+
+def who_to_ron():
+    with Session(engine) as session:
+        runs = session.exec(select(Run).group_by(Run.graph_id)).all()
+        graphs = session.exec(select(Graph)).all()
+        tasks = session.exec(select(Task)).all()
+        rons = session.exec(select(Ron)).all()
+        opts = session.exec(select(Opti)).all()
+    graph_stat = {g.id: {} for g in graphs}
+    task_stat = {t.id: [] for t in tasks}
+    for run in runs:
+        if run.task_id not in graph_stat[run.graph_id]:
+            graph_stat[run.graph_id][run.task_id] = []
+        graph_stat[run.graph_id][run.task_id].append(run.correct)
+        task_stat[run.task_id].append(run.correct)
+    graph_winrates = {}
+    for graph_id in graph_stat:
+        corr = 0
+        tot = 0
+        for task_id in graph_stat[graph_id]:
+            corr += sum(graph_stat[graph_id][task_id]) / len(graph_stat[graph_id][task_id])
+            tot += 1
+        graph_winrates[graph_id] = (corr+1, tot+2)
+    graph_num_opts = {g.id: 0 for g in graphs}
+    for ron in rons:
+        for graph in ron.graphs():
+            graph_num_opts[graph.id] += 1
+    N_ops = sum(graph_num_opts.values())
+    graph = max(graph_winrates, key=lambda x: graph_winrates[x][0] / graph_winrates[x][1] + 2 * math.sqrt(math.log(N_ops) / graph_num_opts[x]))
+    
 
 if __name__ == "__main__":
     # let_us_pick(graph=read_graph_from_a_folder("sample/cot"))

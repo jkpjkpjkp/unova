@@ -1,6 +1,7 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 from sqlalchemy import Column
 from sqlalchemy.types import JSON
+from typing import List, Optional
 import hashlib
 import os
 from image_shelve import go as img_go, put_log, get_log
@@ -34,6 +35,14 @@ class Task(SQLModel, table=True):
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
+class RonRunLink(SQLModel, table=True):
+    ron_id: Optional[bytes] = Field(
+        default=None, foreign_key="ron.id", primary_key=True
+    )
+    run_id: Optional[bytes] = Field(
+        default=None, foreign_key="run.id", primary_key=True
+    )
+
 class Run(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph_id: bytes = Field(foreign_key="graph.id")
@@ -43,6 +52,7 @@ class Run(SQLModel, table=True):
 
     graph: Graph = Relationship(back_populates="runs")
     task: Task = Relationship(back_populates="runs")
+    rons: List["Ron"] = Relationship(back_populates="runs", link_model=RonRunLink)
 
     @property
     def hash(self):
@@ -64,17 +74,24 @@ class Opti(SQLModel, table=True):
 
 class Ron(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
-    run_ids: list[bytes] = Field(sa_column=Column(JSON)) # Field(foreign_key="run.id")
     opti_id: bytes = Field(foreign_key='opti.id')
     log_id: int
-    to: bytes = Field(foreign_key='graph.id')
+    new_graph_id: bytes = Field(foreign_key='graph.id')
     opti: Opti = Relationship(back_populates='rons')
+
+    runs: List["Run"] = Relationship(back_populates="rons", link_model=RonRunLink)
 
     @property
     def hash(self):
-        code = str(self.run_ids) + '\n' + str(self.log_id) + '\n' + str(self.to)
+        code = str(self.log_id) + '\n' + str(self.new_graph_id)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
+    
+    def graphs(self):
+        ret = set()
+        for run in self.runs:
+            ret.add(run.graph)
+        return ret
 
 
 engine = create_engine(f"sqlite:///{db_name}")
@@ -155,6 +172,10 @@ def test_read_task_from_a_parquet():
         print(len(session.exec(select(Task)).all()))
 
 if __name__ == "__main__":
+    # with Session(engine) as session:
+    #     runs = session.exec(select(Run).group_by(Run.graph_id)).all()
+    #     print(runs)
+    # exit()
     graph = read_graph_from_a_folder("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     with Session(engine) as session:
         runs = session.exec(select(Run).where(Run.graph == graph)).all()
