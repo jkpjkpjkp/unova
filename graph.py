@@ -16,6 +16,8 @@ from sqlmodel import Session, select
 from typing import Tuple
 import random
 import math
+
+
 async def operator_custom(input, instruction):
     prompt = instruction + input
     response = await callopenai(prompt)
@@ -58,7 +60,7 @@ def extract_graph_by_exec(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
-def llm_as_judge(output, answer):
+async def llm_as_judge(output, answer):
     prompt = f"""
     You are a judge.
     You are given an output and a ground truth answer.
@@ -67,21 +69,21 @@ def llm_as_judge(output, answer):
     Output: {output}
     Answer: {answer}
     """
-    response = asyncio.run(callopenai(prompt))
+    response = await callopenai(prompt)
     return int(response[-1]), prompt, response
 
-def run_(graph: Graph, task: Task):
+async def run_(graph: Graph, task: Task):
     graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
-    output, localvar = asyncio.run(graph_executable(task.task))
+    output, localvar = await graph_executable(task.task)
     print(output)
     localvar['__OUTPUT__'] = output
-    correct, prompt, response = llm_as_judge(output, task.answer)
+    correct, prompt, response = await llm_as_judge(output, task.answer)
     localvar['__LLM_AS_A_JUDGE_PROMPT__'] = prompt
     localvar['__LLM_AS_A_JUDGE_RESPONSE__'] = response
     go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
     return correct
 
-def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
+async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
     with Session(engine) as session:
         runs = session.exec(select(Run)).all()
         graphs = session.exec(select(Graph)).all()
@@ -113,7 +115,7 @@ def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
         task = session.exec(select(Task).where(Task.id == task_id)).one()
-    run_(graph, task)
+    await run_(graph, task)
 
 
 def xml_extract(str) -> dict:
@@ -160,7 +162,14 @@ def who_to_ron():
     graph = max(graph_winrates, key=lambda x: graph_winrates[x][0] / graph_winrates[x][1] + 2 * math.sqrt(math.log(N_ops) / graph_num_opts[x]))
     
 
+async def main():
+    graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
+    # Read the graph once outside the loop if it's static
+    graph = read_graph_from_a_folder(graph_folder)
+    tasks = [let_us_pick(graph=graph) for _ in range(42)]
+    results = await asyncio.gather(*tasks)
+    # Optional: process results if needed
+    print(f"Completed {len(results)} tasks.")
+
 if __name__ == "__main__":
-    # let_us_pick(graph=read_graph_from_a_folder("sample/cot"))
-    for _ in tqdm(range(42)):
-        let_us_pick(graph=read_graph_from_a_folder("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"))
+    asyncio.run(main())

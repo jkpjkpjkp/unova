@@ -171,16 +171,39 @@ def test_read_task_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
-if __name__ == "__main__":
-    # with Session(engine) as session:
-    #     runs = session.exec(select(Run).group_by(Run.graph_id)).all()
-    #     print(runs)
-    # exit()
-    graph = read_graph_from_a_folder("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+def check_7(folder: str):
+    graph = read_graph_from_a_folder(folder)
     with Session(engine) as session:
         runs = session.exec(select(Run).where(Run.graph == graph)).all()
         print(sum(run.correct for run in runs))
         print(len(runs))
+        tru = {}
+        for run in runs:
+            if not run.task_id in tru:
+                tru[run.task_id] = (0, 0)
+            tru[run.task_id] = (tru[run.task_id][0] + run.correct, tru[run.task_id][1] + 1)
+        print(sum(x[0] / x[1] for x in tru.values()))
+        print(len(tru))
         for run in runs:
             print(run.task.answer)
             print(get_log(run.log_id)['__ANSWER__'])
+
+if __name__ == "__main__":
+    check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    exit()
+    graph = read_graph_from_a_folder("sample/cot")
+    with Session(engine) as session:
+        runs = session.exec(select(Run).where(Run.graph == graph)).all()
+        print(sum(run.correct for run in runs))
+        print(len(runs))
+        tru = {}
+        for run in runs:
+            if not run.task_id in tru:
+                tru[run.task_id] = (0, 0)
+            tru[run.task_id] = (tru[run.task_id][0] + run.correct, tru[run.task_id][1] + 1)
+        print(sum(x[0] / x[1] for x in tru.values()))
+        print(len(tru))
+        for run in runs:
+            print(run.task.answer)
+            print(get_log(run.log_id)['__ANSWER__'])
+        
