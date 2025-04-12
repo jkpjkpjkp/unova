@@ -1,4 +1,4 @@
-from sqlmodel import Field, SQLModel, create_engine, Session, select, delete
+from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 import hashlib
 import os
 from image_shelve import go as img_go, put_log
@@ -9,6 +9,7 @@ class Graph(SQLModel, table=True):
     graph: str
     prompt: str
     task_tag: str
+    runs: list["Run"] = Relationship(back_populates="graph")
 
     @property
     def hash(self):
@@ -23,6 +24,7 @@ class Task(SQLModel, table=True):
     task: str
     answer: float
     tags: list[str]
+    runs: list["Run"] = Relationship(back_populates="task")
 
     @property
     def hash(self):
@@ -37,17 +39,28 @@ class Run(SQLModel, table=True):
     log_id: int
     correct: bool
 
+    graph: Graph = Relationship(back_populates="runs")
+    task: Task = Relationship(back_populates="runs")
+
     @property
     def hash(self):
         code = str(self.graph_id) + '\n' + str(self.task_id) + '\n' + str(self.log_id) + '\n' + str(self.correct)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
-class Optimi(SQLModel, table=True):
+class Opti(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
-    runs: list[bytes] # Field(foreign_key="run.id")
+    graph: str
+    prompt: str
+    rons: list["Ron"] = Relationship(back_populates="opti")
+
+class Ron(SQLModel, table=True):
+    id: bytes = Field(primary_key=True)
+    run_ids: list[bytes] # Field(foreign_key="run.id")
+    opti_id: bytes = Field(foreign_key='opti.id')
     log_id: int
-    to: bytes = Field(foreign_key="graph.id")
+    to: bytes = Field(foreign_key='graph.id')
+    opti: Opti = Relationship(back_populates='rons')
 
     @property
     def hash(self):
