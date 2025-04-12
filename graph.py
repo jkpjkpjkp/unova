@@ -103,11 +103,6 @@ def test_pick_then_execute():
     run(graph, task)
 
 
-
-def one_graph_grow(graph: Graph) -> Graph:
-    
-
-
 if __name__ == "__main__":
     experiment_store.init()
     for _ in range(42):

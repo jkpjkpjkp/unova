@@ -1,5 +1,6 @@
-from experiment_store import Graph, RRun
-
+from experiment_store import Graph, RRun, engine
+from image_shelve import callopenai
+import re
 
 AFLOW = """You are building a Graph and corresponding Prompt to jointly solve {type} problems. 
 Referring to the given graph and prompt, which forms a basic example of a {type} solution approach, 
@@ -43,17 +44,32 @@ solution = await self.generate(problem=f"question:{problem}, xxx:{response['resp
 Note: In custom, the input and instruction are directly concatenated(instruction+input), and placeholders are not supported. Please ensure to add comments and handle the concatenation externally.\n
 
 **Introducing multiple operators at appropriate points can enhance performance. If you find that some provided operators are not yet used in the graph, try incorporating them.**
+
+Your response should be in the following format:
+<modification>xxx(describe what you plan to modify)</modification>
+<graph>xxx(graph code)</graph>
+<prompt>xxx(prompt code)</prompt>
+in accordance with reference sample. 
 """
 
 def aflow(run: RRun) -> Graph:
-    prompt = Aflow.format(
-        type = run.graph.for_task,
+    prompt = AFLOW.format(
+        type = run.graph.task_tag,
         graph = run.graph.graph,
         prompt = run.graph.prompt,
         operator_description = r""""Custom": {
     "description": "A basic operator that executes custom instructions on input",
     "interface": "async def __call__(self, input, instruction)"
-  },"""
+  },""",
         log = run.log,
     )
+    response = callopenai(prompt)
+    return Graph(
+        graph = re.match(r"<graph>(.*?)</graph>", response, re.DOTALL).group(1),
+        prompt = re.match(r"<prompt>(.*?)</prompt>", response, re.DOTALL).group(1),
+        task_tag = run.graph.task_tag,
+    )
+
+
+def select_run() -> RRun:
     

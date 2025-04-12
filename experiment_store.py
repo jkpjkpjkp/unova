@@ -8,13 +8,13 @@ class Graph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
-    for_task: str
+    task_tag: str
 
     @property
     def hash(self):
         self.graph = self.graph.strip(' \n')
         self.prompt = self.prompt.strip(' \n')
-        code = self.graph + '\n' + self.prompt + '\n' + self.for_task
+        code = self.graph + '\n' + self.prompt + '\n' + self.task_tag
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
@@ -43,25 +43,21 @@ class Run(SQLModel, table=True):
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
-class Optim(SQLModel, table=True):
+class Optimi(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
-    runs: list[bytes] = Field(foreign_key="run.id")
-    child: bytes = Field(foreign_key="graph.id")
+    runs: list[bytes] # Field(foreign_key="run.id")
     log_id: int
+    to: bytes = Field(foreign_key="graph.id")
 
     @property
     def hash(self):
-        code = str(self.runs) + '\n' + str(self.child) + '\n' + str(self.log_id)
+        code = str(self.run_ids) + '\n' + str(self.log_id) + '\n' + str(self.to)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
 
-engine = None
-
-def init():
-    global engine
-    engine = create_engine(f"sqlite:///{db_name}")
-    SQLModel.metadata.create_all(engine)
+engine = create_engine(f"sqlite:///{db_name}")
+SQLModel.metadata.create_all(engine)
 
 class RRun:
     graph: Graph
@@ -137,16 +133,15 @@ def test_read_task_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
-def log(graph_id: bytes, task_id: bytes, localvar: dict, output: str, answer: str):
-    from log_shelve import put
+def log_experiment(graph_id: bytes, task_id: bytes, localvar: dict, output: str, answer: str):
+    from image_shelve import put_log
     localvar['__OUTPUT__'] = output
     localvar['__ANSWER__'] = answer
-    log_id = put(localvar)
+    log_id = put_log(localvar)
     with Session(engine) as session:
         run = Run(graph_id=graph_id, task_id=task_id, log_id=log_id, correct=(answer == output))
         session.add(run)
         session.commit()
 
 if __name__ == "__main__":
-    init()
     DANGER_DANGER_DANGER_test_read_graph_from_a_folder()
