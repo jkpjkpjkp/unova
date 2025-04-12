@@ -9,7 +9,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log
 import os
-from experiment_store import Graph, Task, engine, Run, go, Opti, Ron
+from experiment_store import Graph, Task, engine, Run, go, Opti, Ron, read_graph_from_a_folder
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -58,18 +58,30 @@ def extract_graph_by_exec(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
+def llm_as_judge(output, answer):
+    prompt = f"""
+    You are a judge.
+    You are given an output and a ground truth answer.
+    You need to determine if the output is correct. 
+    End your response with 1 if correct, 0 if incorrect. make sure this number is the final character of your response.
+    Output: {output}
+    Answer: {answer}
+    """
+    response = asyncio.run(callopenai(prompt))
+    return int(response[-1]), prompt, response
+
 def run_(graph: Graph, task: Task):
     graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
     output, localvar = asyncio.run(graph_executable(task.task))
     print(output)
-    from tmp import extract_answer
-    answer = extract_answer(output)
     localvar['__OUTPUT__'] = output
-    localvar['__ANSWER__'] = answer
-    go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=answer == task.answer))
-    return answer == task.answer
+    correct, prompt, response = llm_as_judge(output, task.answer)
+    localvar['__LLM_AS_A_JUDGE_PROMPT__'] = prompt
+    localvar['__LLM_AS_A_JUDGE_RESPONSE__'] = response
+    go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
+    return correct
 
-def let_us_pick() -> Tuple[Graph, Task]:
+def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
     with Session(engine) as session:
         runs = session.exec(select(Run)).all()
         graphs = session.exec(select(Graph)).all()
@@ -91,7 +103,7 @@ def let_us_pick() -> Tuple[Graph, Task]:
         graphs.append((corr+1, tot+2, graph_id))
     graph_scores = [(x[0]/x[1]) ** 2 for x in graphs]
     graph_scores = [x / sum(graph_scores) for x in graph_scores]
-    graph_id = random.choices(graphs, weights=graph_scores, k=1)[0][2]
+    graph_id = graph.id if graph else random.choices(graphs, weights=graph_scores, k=1)[0][2]
     tasks = []
     for task_id in task_stat:
         tasks.append((sum(task_stat[task_id]) + 1, len(task_stat[task_id]) + 2, task_id))
@@ -119,5 +131,6 @@ def ron_(opti: Opti, runs: list[Run]):
     go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), correct=output == runs[0].task.answer))
 
 if __name__ == "__main__":
+    # let_us_pick(graph=read_graph_from_a_folder("sample/cot"))
     for _ in tqdm(range(42)):
-        let_us_pick()
+        let_us_pick(graph=read_graph_from_a_folder("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"))

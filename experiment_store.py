@@ -3,7 +3,7 @@ from sqlalchemy import Column
 from sqlalchemy.types import JSON
 import hashlib
 import os
-from image_shelve import go as img_go, put_log
+from image_shelve import go as img_go, put_log, get_log
 db_name = "main.db"
 
 class Graph(SQLModel, table=True):
@@ -87,7 +87,7 @@ def go(x):
         merged_x = session.merge(x)
         session.commit()
         session.refresh(merged_x)
-
+    return merged_x
 
 def test_graph_insert():
     g = Graph(graph="import hi", prompt="LO = 'avavav'")
@@ -95,7 +95,7 @@ def test_graph_insert():
     print(g.id)
 
 
-def DANGER_DANGER_DANGER_read_graph_from_a_folder(folder: str):
+def read_graph_from_a_folder(folder: str):
     graph_file = os.path.join(folder, "graph.py")
     prompt_file = os.path.join(folder, "prompt.py")
     with open(graph_file, "r") as f:
@@ -103,18 +103,15 @@ def DANGER_DANGER_DANGER_read_graph_from_a_folder(folder: str):
     with open(prompt_file, "r") as f:
         prompt = f.read()
     graph = Graph(graph=graph, prompt=prompt, task_tag='counting')
-
-    # remove all graphs in db
-    with Session(engine) as session:
-        session.exec(delete(Graph))
-        session.commit()
-
-    go(graph)
+    return go(graph)
 
 def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
+        session.exec(delete(Graph))
+        session.commit()
+    with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
-    DANGER_DANGER_DANGER_read_graph_from_a_folder("sample/cot")
+    read_graph_from_a_folder("sample/cot")
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
 
@@ -158,6 +155,11 @@ def test_read_task_from_a_parquet():
         print(len(session.exec(select(Task)).all()))
 
 if __name__ == "__main__":
+    graph = read_graph_from_a_folder("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     with Session(engine) as session:
-        print(len(session.exec(select(Run)).all()))
-        print(sum(x.correct for x in session.exec(select(Run)).all()))
+        runs = session.exec(select(Run).where(Run.graph == graph)).all()
+        print(sum(run.correct for run in runs))
+        print(len(runs))
+        for run in runs:
+            print(run.task.answer)
+            print(get_log(run.log_id)['__ANSWER__'])

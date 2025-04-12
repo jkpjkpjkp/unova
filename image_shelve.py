@@ -22,12 +22,16 @@ def put_log(log: dict):
     global tot_log
     with tot_log_lock:
         tot_log += 1
-        local_tot = tot
+        local_tot = tot_log
     log_shelve[str(local_tot)] = log
     return local_tot
 
 def get_log(log_id: int):
     return log_shelve[str(log_id)]
+
+if __name__ == "__main__":
+    print(tot_log)
+    exit()
 
 short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')
