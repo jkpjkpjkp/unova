@@ -9,7 +9,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log
 import os
-from experiment_store import Graph, Task, engine, Run, go, Opti
+from experiment_store import Graph, Task, engine, Run, go, Opti, Ron
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -64,7 +64,9 @@ def run_(graph: Graph, task: Task):
     print(output)
     from tmp import extract_answer
     answer = extract_answer(output)
-    go(Run(graph_id=graph.id, task_id=task.id, log_id=put_log(dict(localvar)), correct=answer == task.answer))
+    localvar['__OUTPUT__'] = output
+    localvar['__ANSWER__'] = answer
+    go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=answer == task.answer))
     return answer == task.answer
 
 def let_us_pick() -> Tuple[Graph, Task]:
@@ -102,9 +104,19 @@ def let_us_pick() -> Tuple[Graph, Task]:
     run_(graph, task)
 
 
-def ron_(opti: Opti, runs: list[Run]):
-    TODO
+def xml_extract(str) -> dict:
+    str = re.sub(r'^\s*<.*?>\s*', '', str)
+    str = re.sub(r'\s*</.*?>\s*$', '', str)
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(str)
+    return {child.tag: child.text for child in root}
 
+def ron_(opti: Opti, runs: list[Run]):
+    graph_executable = extract_graph_by_exec(opti.graph, opti.prompt)
+    output, localvar = asyncio.run(graph_executable(runs))
+    print(output)
+    graph_id = go()
+    go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), correct=output == runs[0].task.answer))
 
 if __name__ == "__main__":
     for _ in tqdm(range(42)):

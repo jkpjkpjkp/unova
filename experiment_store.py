@@ -157,12 +157,7 @@ def test_read_task_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
-def log_experiment(graph_id: bytes, task_id: bytes, localvar: dict, output: str, answer: str):
-    from image_shelve import put_log
-    localvar['__OUTPUT__'] = output
-    localvar['__ANSWER__'] = answer
-    log_id = put_log(localvar)
+if __name__ == "__main__":
     with Session(engine) as session:
-        run = Run(graph_id=graph_id, task_id=task_id, log_id=log_id, correct=(answer == output))
-        session.add(run)
-        session.commit()
+        print(len(session.exec(select(Run)).all()))
+        print(sum(x.correct for x in session.exec(select(Run)).all()))
