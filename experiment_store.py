@@ -1,13 +1,14 @@
 from sqlmodel import Field, SQLModel, create_engine, Session, select, delete
 import hashlib
 import os
-from image_shelve import go as img_go
+from image_shelve import go as img_go, put_log
 db_name = "main.db"
 
 class Graph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
+    for_task: str
 
     @property
     def hash(self):
@@ -15,7 +16,7 @@ class Graph(SQLModel, table=True):
             return self.id
         self.graph = self.graph.strip(' \n')
         self.prompt = self.prompt.strip(' \n')
-        code = self.graph + '\n' + self.prompt
+        code = self.graph + '\n' + self.prompt + '\n' + self.for_task
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
@@ -23,6 +24,7 @@ class Task(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
     answer: float
+    tags: list[str]
 
     @property
     def hash(self):
@@ -54,14 +56,25 @@ def init():
     engine = create_engine(f"sqlite:///{db_name}")
     SQLModel.metadata.create_all(engine)
 
+class RRun:
+    graph: Graph
+    task: Task
+    log: dict
+    correct: bool
+
 def go(x):
+    if isinstance(x, RRun):
+        x = Run(
+            graph_id=x.graph.hash,
+            task_id=x.task.hash,
+            log_id=put_log(x.log),
+            correct=x.correct,
+        )
     x.id = x.id or x.hash
     with Session(engine) as session:
         merged_x = session.merge(x)
         session.commit()
         session.refresh(merged_x)
-
-
 
 
 def test_graph_insert():

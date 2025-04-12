@@ -13,6 +13,22 @@ import argparse
 import asyncio
 model = "gemini-2.0-pro-exp-02-05"
 
+
+log_shelve = shelve.open('log.shelve')
+tot_log = len(log_shelve.keys())
+tot_log_lock = Lock()
+
+def put_log(log: dict):
+    global tot_log
+    with tot_log_lock:
+        tot_log += 1
+        local_tot = tot
+    log_shelve[str(local_tot)] = log
+    return local_tot
+
+def get_log(log_id: int):
+    return log_shelve[str(log_id)]
+
 short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')
 
