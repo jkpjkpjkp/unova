@@ -1,6 +1,8 @@
-from experiment_store import Graph, RRun, engine
+from experiment_store import Graph, RRun, engine, Run, Task, Optimi
 from image_shelve import callopenai
 import re
+from sqlmodel import Session, select
+import math
 
 AFLOW = """You are building a Graph and corresponding Prompt to jointly solve {type} problems. 
 Referring to the given graph and prompt, which forms a basic example of a {type} solution approach, 
@@ -71,5 +73,33 @@ def aflow(run: RRun) -> Graph:
     )
 
 
+
+##### UNDONE BELOW
+
 def select_run() -> RRun:
+    C = 0.1
+    with Session(engine) as session:
+        runs = session.exec(select(Run)).all()
+        graphs = session.exec(select(Graph)).all()
+        tasks = session.exec(select(Task)).all()
+        optims = session.exec(select(Optimi)).all()
+    N = len(optims)
+    graph_stat = {g.id: {} for g in graphs}
+    task_stat = {t.id: [] for t in tasks}
+    for run in runs:
+        if run.task_id not in graph_stat[run.graph_id]:
+            graph_stat[run.graph_id][run.task_id] = []
+        graph_stat[run.graph_id][run.task_id].append(run.correct)
+        task_stat[run.task_id].append(run.correct)
     
+    for graph_id in graph_stat:
+        corr = 0
+        tot = 0
+        for task_id in graph_stat[graph_id]:
+            corr += sum(graph_stat[graph_id][task_id]) / len(graph_stat[graph_id][task_id])
+            tot += 1
+        graphs.append((corr+1, tot+2, graph_id))
+    graph_scores = [(x[0]/x[1]) + C * math.sqrt(2 * math.log(N) / x[1]) for x in graphs]
+    argmax_graph = graphs[graph_scores.index(max(graph_scores))]
+    if not graph_stat[argmax_graph.id][1]:
+        from graph import let_us_pick

@@ -9,12 +9,11 @@ import functools
 import sys
 from image_shelve import call_openai
 import os
-from experiment_store import Graph, Task, init, Run, log
+from experiment_store import Graph, Task, engine, Run, log
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
 from typing import Tuple
-import experiment_store
 import random
 
 async def operator_custom(input, instruction):
@@ -65,7 +64,7 @@ def run(graph: Graph, task: Task):
     return answer == task.answer
 
 def let_us_pick() -> Tuple[Graph, Task]:
-    with Session(experiment_store.engine) as session:
+    with Session(engine) as session:
         runs = session.exec(select(Run)).all()
         graphs = session.exec(select(Graph)).all()
         tasks = session.exec(select(Task)).all()
@@ -93,17 +92,12 @@ def let_us_pick() -> Tuple[Graph, Task]:
     task_scores = [(0.4 - x[0]/x[1]) ** 2 for x in tasks]
     task_scores = [x / sum(task_scores) for x in task_scores]
     task_id = random.choices(tasks, weights=task_scores, k=1)[0][2]
-    with Session(experiment_store.engine) as session:
+    with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
         task = session.exec(select(Task).where(Task.id == task_id)).one()
-    return graph, task
-
-def test_pick_then_execute():
-    graph, task = let_us_pick()
     run(graph, task)
 
 
+
 if __name__ == "__main__":
-    experiment_store.init()
-    for _ in range(42):
-        test_pick_then_execute()
+    let_us_pick()
