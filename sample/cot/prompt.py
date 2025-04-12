@@ -16,7 +16,8 @@ Response:
 Okay, the question asks me how many chairs there are in each row in my block. Let's see.  the row directly before me has five chairs visible. But that is clearly not how many is in each row, for occlusion on each side. Perhaps I should count one that is in the front, so that every chair is in view. Wait, but the chairs in the front rows are really small and I cannot very well tell them from another. Maybe I will choose the fourth row before me where all chairs are clearly visible and not too far away and recognizable. Let me count from left to right and output coordinates: there are one two three four five six seven eight nine 10 11 12 13 chairs (coordinates omitted.) There are 13 chairs in each row in my block. Let me count another row to see if the chairs are indeed rectangular. Let me use the third row in front of me: from left to right, one two three four five six seven eight nine 10 11 12 13, the 13th chair is half visible. okay I think we can conclude that the final answer is \boxed{13} 
 """
 
-shot3 = """
+shot3 = r"""
+please put final answer in \boxed{}. your task now:
 Question: """
 
 COT_PROMPT = shot1 + shot2 + shot3

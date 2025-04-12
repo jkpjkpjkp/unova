@@ -9,12 +9,13 @@ import functools
 import sys
 from image_shelve import call_openai
 import os
-from experiment_store import Graph, Task, init, Run, log_experiment
+from experiment_store import Graph, Task, init, Run, log
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
 from typing import Tuple
 import experiment_store
+import random
 
 async def operator_custom(input, instruction):
     prompt = instruction + input
@@ -30,24 +31,21 @@ def extract_graph_by_text(graph_load: str) -> str:
     pattern = re.compile(r"class Graph:.*?(?=^\S|\Z)", re.DOTALL | re.MULTILINE)
     return re.match(pattern, graph_load).group(0)
 
-
 def extract_local_variables(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        original_trace = sys.gettrace()
-
+        original = sys.gettrace()
         captured_locals = {}
-        def trace_func(frame, event, _arg):
+        def a(frame, event, _arg):
             if event == 'return' and frame.f_code is func.__code__:
                 nonlocal captured_locals
                 captured_locals = frame.f_locals
-            return trace_func
-        sys.settrace(trace_func)
-
+            return a
+        sys.settrace(a)
         try:
             result = await func(*args, **kwargs)
         finally:
-            sys.settrace(original_trace)
+            sys.settrace(original)
         return result, captured_locals
     return wrapper
 
@@ -59,42 +57,18 @@ def extract_graph_by_exec(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
-
-def conduct_experiment(graph: Graph, task: Task):
+def run(graph: Graph, task: Task):
     graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
     output, localvar = asyncio.run(graph_executable(task.task))
-    answer = re.findall(r'<boxed>(.*?)</boxed>', output)[-1]
-    log_experiment(graph.id, task.id, localvar, output, answer)
+    answer = re.findall(r'\boxed{(.*?)}', output)[-1]
+    log(graph.id, task.id, localvar, output, answer)
     return answer == task.answer
 
-def graph_stat(x: Graph):
-    x.id = x.id or x.hash
-    with Session(experiment_store.engine) as session:
-        runs = session.exec(select(Run).where(Run.graph_id == x.id))
-        tasks = {}
-        for run in runs:
-            if run.task_id not in tasks:
-                tasks[run.task_id] = []
-            tasks[run.task_id].append(run)
-        correct = 0
-        for task in tasks:
-            correct += sum([run.correct for run in tasks[task]]) / len(tasks[task])
-        return correct, len(tasks)
-
-def task_stat(x: Task):
-    x.id = x.id or x.hash
-    with Session(experiment_store.engine) as session:
-        runs = session.exec(select(Run).where(Run.task_id == x.id))
-        return sum(map(lambda x: x.correct, runs)), len(runs)
-
 def let_us_pick() -> Tuple[Graph, Task]:
-    import random
-    
     with Session(experiment_store.engine) as session:
         runs = session.exec(select(Run)).all()
         graphs = session.exec(select(Graph)).all()
         tasks = session.exec(select(Task)).all()
-
     graph_stat = {g.id: {} for g in graphs}
     task_stat = {t.id: [] for t in tasks}
     for run in runs:
@@ -124,15 +98,15 @@ def let_us_pick() -> Tuple[Graph, Task]:
         task = session.exec(select(Task).where(Task.id == task_id)).one()
     return graph, task
 
-
-def let_us_pick_task(graph_id: bytes):
-    with Session(experiment_store.engine) as session:
-        tasks = session.exec(select(Task).where(Task.graph_id == graph_id))
-    return tasks[0]
-
 def test_pick_then_execute():
     graph, task = let_us_pick()
-    conduct_experiment(graph, task)
+    run(graph, task)
+
+
+
+def one_graph_grow(graph: Graph) -> Graph:
+    
+
 
 if __name__ == "__main__":
     experiment_store.init()
