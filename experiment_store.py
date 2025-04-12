@@ -166,6 +166,3 @@ def log_experiment(graph_id: bytes, task_id: bytes, localvar: dict, output: str,
         run = Run(graph_id=graph_id, task_id=task_id, log_id=log_id, correct=(answer == output))
         session.add(run)
         session.commit()
-
-if __name__ == "__main__":
-    DANGER_DANGER_DANGER_test_read_graph_from_a_folder()

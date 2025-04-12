@@ -107,4 +107,5 @@ def ron_(opti: Opti, runs: list[Run]):
 
 
 if __name__ == "__main__":
-    let_us_pick()
+    for _ in tqdm(range(42)):
+        let_us_pick()
