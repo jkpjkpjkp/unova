@@ -1,5 +1,5 @@
 shot1 = r"""
-Question: <image_1M> How many kettlebells are there in the image?
+Question: <image_1Q> How many kettlebells are there in the image?
 
 Response: 
 Okay, so I am looking at the image inside a gym and the question is for me to count the number of kettlebells. I noticed there are two rows of kettlebells on the top of this front shelf.  I'm focusing on these rows on the upper-middle part of this image. 

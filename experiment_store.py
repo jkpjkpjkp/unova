@@ -1,4 +1,6 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
+from sqlalchemy import Column
+from sqlalchemy.types import JSON
 import hashlib
 import os
 from image_shelve import go as img_go, put_log
@@ -23,7 +25,7 @@ class Task(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
     answer: float
-    tags: list[str]
+    tags: list[str] = Field(sa_column=Column(JSON))
     runs: list["Run"] = Relationship(back_populates="task")
 
     @property
@@ -54,9 +56,15 @@ class Opti(SQLModel, table=True):
     prompt: str
     rons: list["Ron"] = Relationship(back_populates="opti")
 
+    @property
+    def hash(self):
+        code = self.graph + '\n' + self.prompt
+        self.id = hashlib.sha256(code.encode('utf-8')).digest()
+        return self.id
+
 class Ron(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
-    run_ids: list[bytes] # Field(foreign_key="run.id")
+    run_ids: list[bytes] = Field(sa_column=Column(JSON)) # Field(foreign_key="run.id")
     opti_id: bytes = Field(foreign_key='opti.id')
     log_id: int
     to: bytes = Field(foreign_key='graph.id')
@@ -72,20 +80,8 @@ class Ron(SQLModel, table=True):
 engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(engine)
 
-class RRun:
-    graph: Graph
-    task: Task
-    log: dict
-    correct: bool
 
 def go(x):
-    if isinstance(x, RRun):
-        x = Run(
-            graph_id=x.graph.hash,
-            task_id=x.task.hash,
-            log_id=put_log(x.log),
-            correct=x.correct,
-        )
     x.id = x.id or x.hash
     with Session(engine) as session:
         merged_x = session.merge(x)
@@ -98,6 +94,7 @@ def test_graph_insert():
     go(g)
     print(g.id)
 
+
 def DANGER_DANGER_DANGER_read_graph_from_a_folder(folder: str):
     graph_file = os.path.join(folder, "graph.py")
     prompt_file = os.path.join(folder, "prompt.py")
@@ -105,7 +102,7 @@ def DANGER_DANGER_DANGER_read_graph_from_a_folder(folder: str):
         graph = f.read()
     with open(prompt_file, "r") as f:
         prompt = f.read()
-    graph = Graph(graph=graph, prompt=prompt)
+    graph = Graph(graph=graph, prompt=prompt, task_tag='counting')
 
     # remove all graphs in db
     with Session(engine) as session:
@@ -121,6 +118,20 @@ def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
 
+def read_opti_from_a_folder(folder: str):
+    with open(os.path.join(folder, "graph.py"), "r") as f:
+        graph = f.read()
+    with open(os.path.join(folder, "prompt.py"), "r") as f:
+        prompt = f.read()
+    opti = Opti(graph=graph, prompt=prompt)
+    go(opti)
+
+def test_read_opti_from_a_folder():
+    with Session(engine) as session:
+        print(len(session.exec(select(Opti)).all()))
+    read_opti_from_a_folder("sampo/bflow")
+    with Session(engine) as session:
+        print(len(session.exec(select(Opti)).all()))
 
 def read_task_from_a_parquet(filepath: str):
     import polars as pl

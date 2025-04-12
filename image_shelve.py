@@ -36,7 +36,10 @@ tot = len(long_hash_to_short_hash.keys())
 tot_lock = Lock()
 
 def get_image_by_short_hash(short_hash):
-    return short_hash_to_image[short_hash]
+    ret = short_hash_to_image[short_hash]
+    if not hasattr(ret, 'filename'):
+        ret.filename = ""
+    return ret.convert('RGB')
 
 def int_to_0aA(i):
     chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -108,8 +111,9 @@ def back(x):
         return x
 
 
-async def call_openai(x: str):
+async def callopenai(x: str):
     # HANGING: duplicate reference to image, in logs. 
+    print(x)
     parts = re.split(ugly, x)
     content = []
     for i, part in enumerate(parts):
@@ -117,10 +121,10 @@ async def call_openai(x: str):
             if part.strip():
                 content.append({"type": "text", "text": part})
         else:
+            print(part)
             buffer = io.BytesIO()
             img = get_image_by_short_hash(part)
-            if not hasattr(img, 'filename'):
-                img.filename = ""
+            
 
             max_dim = 2000
             if max(img.width, img.height) > max_dim:
@@ -144,9 +148,23 @@ async def call_openai(x: str):
         }],
     ).choices[0].message.content
 
+def cli():
+    while True:
+        short_hash = input("Enter short hash or image path (or press Enter/q to quit): ")
+        try:
+            if not short_hash:
+                break
+            if os.path.exists(short_hash):
+                image = Image.open(short_hash)
+                print(img_go(image))
+            else:
+                image = get_image_by_short_hash(short_hash)
+                image.show()
+        except KeyError:
+            print(f"Error: Short hash '{short_hash}' not found.")
+        except Exception as e:
+            print(f"Error: {e}")
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--image_path", type=str, required=True)
-    args = parser.parse_args()
-    image = Image.open(args.image_path)
-    print(img_go(image))
+    cli()

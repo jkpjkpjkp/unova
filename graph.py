@@ -7,9 +7,9 @@ takes in files (code text) and returns executable
 import re
 import functools
 import sys
-from image_shelve import call_openai
+from image_shelve import callopenai, put_log
 import os
-from experiment_store import Graph, Task, engine, Run, log
+from experiment_store import Graph, Task, engine, Run, go, Opti
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -18,7 +18,7 @@ import random
 
 async def operator_custom(input, instruction):
     prompt = instruction + input
-    response = await call_openai(prompt)
+    response = await callopenai(prompt)
     return response
 
 
@@ -45,6 +45,8 @@ def extract_local_variables(func):
             result = await func(*args, **kwargs)
         finally:
             sys.settrace(original)
+        captured_locals = dict(captured_locals)
+        captured_locals.pop('self')
         return result, captured_locals
     return wrapper
 
@@ -56,11 +58,13 @@ def extract_graph_by_exec(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
-def run(graph: Graph, task: Task):
+def run_(graph: Graph, task: Task):
     graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
     output, localvar = asyncio.run(graph_executable(task.task))
-    answer = re.findall(r'\boxed{(.*?)}', output)[-1]
-    log(graph.id, task.id, localvar, output, answer)
+    print(output)
+    from tmp import extract_answer
+    answer = extract_answer(output)
+    go(Run(graph_id=graph.id, task_id=task.id, log_id=put_log(dict(localvar)), correct=answer == task.answer))
     return answer == task.answer
 
 def let_us_pick() -> Tuple[Graph, Task]:
@@ -95,8 +99,11 @@ def let_us_pick() -> Tuple[Graph, Task]:
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
         task = session.exec(select(Task).where(Task.id == task_id)).one()
-    run(graph, task)
+    run_(graph, task)
 
+
+def ron_(opti: Opti, runs: list[Run]):
+    TODO
 
 
 if __name__ == "__main__":
