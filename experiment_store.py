@@ -1,4 +1,6 @@
 from sqlmodel import Field, SQLModel, create_engine, Session, select, delete
+from sqlalchemy import Column
+from sqlalchemy.types import JSON
 import hashlib
 import os
 from image_shelve import go as img_go, put_log
@@ -22,7 +24,7 @@ class Task(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
     answer: float
-    tags: list[str]
+    tags: list[str] = Field(sa_column=Column(JSON))
 
     @property
     def hash(self):
@@ -45,7 +47,7 @@ class Run(SQLModel, table=True):
 
 class Optimi(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
-    runs: list[bytes] # Field(foreign_key="run.id")
+    runs: list[bytes] = Field(sa_column=Column(JSON)) # Field(foreign_key="run.id")
     log_id: int
     to: bytes = Field(foreign_key="graph.id")
 
