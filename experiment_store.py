@@ -21,7 +21,15 @@ class Graph(SQLModel, table=True):
         code = self.graph + '\n' + self.prompt + '\n' + self.task_tag
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
-
+    
+    @property
+    def experience(self):
+        return [(x.modification, x.graph.score) for x in get(Ron, Graph)[self.id]]
+    
+    @property
+    def score(self):
+        runs = gett(Run, Graph, Task)[self.id]
+        return (sum(sum(run.correct for run in runs[task.id]) / len(runs[task.id]) for task in runs) + 1) / (len(runs) + 2)
 class Task(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
@@ -67,6 +75,10 @@ class Run(SQLModel, table=True):
     @property
     def task_tag(self):
         return self.graph.task_tag
+    
+    @property
+    def experience(self):
+        return self.graph.experience
 
 class Groph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
@@ -95,13 +107,24 @@ class Ron(SQLModel, table=True):
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
     
+    @property
     def graphs(self):
         ret = set()
         for run in self.runs:
             ret.add(run.graph)
         return ret
 
-
+    @property
+    def new_graph(self):
+        return get_by_id(Graph, self.new_graph_id)
+    
+    @property
+    def log(self):
+        return get_log(self.log_id)
+    
+    @property
+    def modification(self):
+        return self.log['modification']
 engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(engine)
 
@@ -201,6 +224,10 @@ def add_tag_to_task():
             task.tags = ['zerobench']
             session.merge(task)
         session.commit()
+
+def get_by_id(ret_type, id: bytes):
+    with Session(engine) as session:
+        return session.exec(select(ret_type).where(ret_type.id == id)).first()
 
 def get(ret_type, group_by):
     with Session(engine) as session:

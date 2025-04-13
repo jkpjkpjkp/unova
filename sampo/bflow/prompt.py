@@ -14,7 +14,9 @@ Considering information loss, complex graphs may yield better results, but insuf
 
 Here is a graph and the corresponding prompt (prompt only related to the custom method) that performed excellently in a previous iteration (maximum score is 1). You must make further optimizations and improvements based on this graph. The modified graph must differ from the provided example, and the specific differences should be noted within the <modification>xxx</modification> section.\n
 <sample>
+    <experience>{experience}</experience>
     <modification>(such as:add /delete /modify / ...)</modification>
+    <score>{score}</score>
     <graph>{graph}</graph>
     <prompt>{prompt}</prompt>
     <operator_description>{operator_description}</operator_description>
@@ -29,7 +31,8 @@ When introducing new functionalities in the graph, please make sure to import th
 
 """
 
-AFLOW_TAIL = r"""
+
+CUSTOM_USE = """
 Here's an example of using the `custom` method in graph:
 ```
 # You can write your own prompt in <prompt>XXX_PROMPT="your_prompt"</prompt> and then use it in the Custom method in the graph
@@ -42,12 +45,4 @@ solution = await self.generate(problem=f"question:{problem}, xxx:{response['resp
 Note: In custom, the input and instruction are directly concatenated(instruction+input), and placeholders are not supported. Please ensure to add comments and handle the concatenation externally.\n
 
 **Introducing multiple operators at appropriate points can enhance performance. If you find that some provided operators are not yet used in the graph, try incorporating them.**
-
-Your response should be in the following format:
-<modification>xxx(describe what you plan to modify)</modification>
-<graph>xxx(graph code)</graph>
-<prompt>xxx(prompt code)</prompt>
-in accordance with reference sample. 
 """
-
-AFLOW += AFLOW_TAIL
