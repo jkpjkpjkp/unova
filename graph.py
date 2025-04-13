@@ -153,6 +153,7 @@ def who_to_optimize(tag: Optional[str]) -> Run:
     graph_runs = get_graph_runs()
     graph_stat = get_graph_stat()
     graph_opti = get_graph_opti()
+    TODO
      
 
 async def run_graph_42():
