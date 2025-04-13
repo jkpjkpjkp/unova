@@ -75,7 +75,7 @@ async def run_(graph: Graph, task: Task):
     go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
     return correct
 
-def get_graph_runs(tag: Optional[str]) -> dict[bytes, list]:
+def get_graph_runs(tag: Optional[str]) -> dict[bytes, dict[bytes, list[Run]]]:
     graph_stat = {g.id: {} for g in graphs}
     with Session(engine) as session:
         runs = session.exec(select(Run)).all()
@@ -85,37 +85,44 @@ def get_graph_runs(tag: Optional[str]) -> dict[bytes, list]:
             graph_stat[run.graph_id][run.task_id] = []
         graph_stat[run.graph_id][run.task_id].append(run.correct)
 
-def get_graph_stat() -> list[tuple[float, int, bytes]]:
+def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     graph_stat = get_graph_runs()
-    graphs = []
+    graphs = {}
     for graph_id in graph_stat:
         corr = 0
         tot = 0
         for task_id in graph_stat[graph_id]:
             corr += sum(graph_stat[graph_id][task_id]) / len(graph_stat[graph_id][task_id])
             tot += 1
-        graphs.append((corr+1, tot+2, graph_id))
+        graphs[graph_id] = (corr+1, tot+2)
     return graphs
 
-def get_task_runs() -> dict:
+def get_task_runs() -> dict[bytes, list[Run]]:
     task_stat = {t.id: [] for t in tasks}
     with Session(engine) as session:
         runs = session.exec(select(Run)).all()
         tasks = session.exec(select(Task)).all()
     for run in runs:
         task_stat[run.task_id].append(run.correct)
+    return task_stat
 
-async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
+def get_task_stat() -> dict[bytes, tuple[float, int]]:
     task_stat = get_task_runs()
-    graphs = get_graph_stat()
-    graph_scores = [(x[0]/x[1]) ** 2 for x in graphs]
-    graph_scores = [x / sum(graph_scores) for x in graph_scores]
-    graph_id = graph.id if graph else random.choices(graphs, weights=graph_scores, k=1)[0][2]
-    tasks = []
+    tasks = {}
     for task_id in task_stat:
-        tasks.append((sum(task_stat[task_id]) + 1, len(task_stat[task_id]) + 2, task_id))
-    task_scores = [(0.4 - x[0]/x[1]) ** 2 for x in tasks]
-    task_id = random.choices(tasks, weights=task_scores, k=1)[0][2]
+        tasks[task_id] = (sum(task_stat[task_id]) + 1, len(task_stat[task_id]) + 2)
+    return tasks
+
+async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
+    if graph:
+        graph_id = graph.id
+    else:
+        graphs = get_graph_stat()
+        graph_id = random.choices(graphs.keys(), weights=[(stat[0] / stat[1]) ** 2 for stat in graphs.values()], k=1)[0]
+    
+    tasks = get_task_stat()
+    task_id = random.choices(tasks.keys(), weights=[(0.4 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
+    
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
         task = session.exec(select(Task).where(Task.id == task_id)).one()
