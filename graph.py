@@ -17,36 +17,34 @@ async def operator_custom(input, instruction):
     response = await callopenai(prompt)
     return response
 
-
 operators_dict = {
     "Custom": operator_custom,
 }
 
-def extract_graph_by_text(graph_load: str) -> str:
-    pattern = re.compile(r"class Graph:.*?(?=^\S|\Z)", re.DOTALL | re.MULTILINE)
-    return re.match(pattern, graph_load).group(0)
 
 def extract_local_variables(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         original = sys.gettrace()
         captured_locals = {}
-        def a(frame, event, _arg):
+        def trace(frame, event, _arg):
             if event == 'return' and frame.f_code is func.__code__:
                 nonlocal captured_locals
                 captured_locals = frame.f_locals
-            return a
-        sys.settrace(a)
+            return trace
+        sys.settrace(trace)
         try:
             result = await func(*args, **kwargs)
-        finally:
+        except:
             sys.settrace(original)
+            raise
+        sys.settrace(original)
         captured_locals = dict(captured_locals)
         captured_locals.pop('self')
         return result, captured_locals
     return wrapper
 
-def extract_graph_by_exec(graph_code: str, prompt_code: str):
+def graph_executable(graph_code: str, prompt_code: str):
     graph_code += '\n' + prompt_code
     namespace = {}
     exec(graph_code, namespace)
@@ -67,7 +65,7 @@ async def llm_as_judge(output, answer):
     return int(response[-1]), prompt, response
 
 async def run_(graph: Graph, task: Task):
-    graph_executable = extract_graph_by_exec(graph.graph, graph.prompt)
+    graph_executable = graph_executable(graph.graph, graph.prompt)
     output, localvar = await graph_executable(task.task)
     print(output)
     localvar['__OUTPUT__'] = output
@@ -78,17 +76,24 @@ async def run_(graph: Graph, task: Task):
     return correct
 
 async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
-    with Session(engine) as session:
-        runs = session.exec(select(Run)).all()
-        graphs = session.exec(select(Graph)).all()
-        tasks = session.exec(select(Task)).all()
-    graph_stat = {g.id: {} for g in graphs}
-    task_stat = {t.id: [] for t in tasks}
-    for run in runs:
-        if run.task_id not in graph_stat[run.graph_id]:
-            graph_stat[run.graph_id][run.task_id] = []
-        graph_stat[run.graph_id][run.task_id].append(run.correct)
-        task_stat[run.task_id].append(run.correct)
+    def get_graph_stat() -> dict:
+        graph_stat = {g.id: {} for g in graphs}
+        with Session(engine) as session:
+            runs = session.exec(select(Run)).all()
+            graphs = session.exec(select(Graph)).all()
+        for run in runs:
+            if run.task_id not in graph_stat[run.graph_id]:
+                graph_stat[run.graph_id][run.task_id] = []
+            graph_stat[run.graph_id][run.task_id].append(run.correct)
+    def get_task_stat() -> dict:
+        task_stat = {t.id: [] for t in tasks}
+        with Session(engine) as session:
+            runs = session.exec(select(Run)).all()
+            tasks = session.exec(select(Task)).all()
+        for run in runs:
+            task_stat[run.task_id].append(run.correct)
+    graph_stat = get_graph_stat()
+    task_stat = get_task_stat()
     graphs = []
     for graph_id in graph_stat:
         corr = 0
@@ -112,7 +117,7 @@ async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
     await run_(graph, task)
 
 
-def xml_extract(str) -> dict:
+def extract_xml(str) -> dict:
     str = re.sub(r'^\s*<.*?>\s*', '', str)
     str = re.sub(r'\s*</.*?>\s*$', '', str)
     import xml.etree.ElementTree as ET
@@ -120,9 +125,9 @@ def xml_extract(str) -> dict:
     return {child.tag: child.text for child in root}
 
 def ron_(opti: Opti, runs: list[Run]):
-    opti_executable = extract_graph_by_exec(opti.graph, opti.prompt)
+    opti_executable = graph_executable(opti.graph, opti.prompt)
     output, localvar = asyncio.run(opti_executable(runs))
-    o_dic = xml_extract(output)
+    o_dic = extract_xml(output)
     new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
     go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
