@@ -188,6 +188,14 @@ def check_7(folder: str):
             print(run.task.answer)
             print(get_log(run.log_id)['__ANSWER__'])
 
+def add_tag_to_task():
+    with Session(engine) as session:
+        tasks = session.exec(select(Task)).all()
+        for task in tasks:
+            task.tags = ['zerobench']
+            session.merge(task)
+        session.commit()
+
 if __name__ == "__main__":
     check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     exit()
