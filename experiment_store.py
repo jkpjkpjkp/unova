@@ -11,14 +11,14 @@ class Graph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
-    task_tag: str
+    tags: list[str] = Field(sa_column=Column(JSON))
     runs: list["Run"] = Relationship(back_populates="graph")
 
     @property
     def hash(self):
         self.graph = self.graph.strip(' \n')
         self.prompt = self.prompt.strip(' \n')
-        code = self.graph + '\n' + self.prompt + '\n' + self.task_tag
+        code = self.graph + '\n' + self.prompt
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
