@@ -12,7 +12,7 @@ import random
 import math
 from typing import Optional
 
-async def operator_custom(input, instruction):
+async def operator_custom(input, instruction=""):
     prompt = instruction + input
     response = await callopenai(prompt)
     return response
