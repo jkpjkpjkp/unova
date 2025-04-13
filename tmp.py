@@ -1,7 +1,5 @@
 import re
 
-
-
 def extract_answer(s):
     start = s.find("\\boxed{")
     if start == -1:

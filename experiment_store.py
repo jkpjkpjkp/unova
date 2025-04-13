@@ -11,14 +11,14 @@ class Graph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
-    tags: list[str] = Field(sa_column=Column(JSON))
+    task_tag: str
     runs: list["Run"] = Relationship(back_populates="graph")
 
     @property
     def hash(self):
         self.graph = self.graph.strip(' \n')
         self.prompt = self.prompt.strip(' \n')
-        code = self.graph + '\n' + self.prompt
+        code = self.graph + '\n' + self.prompt + '\n' + self.task_tag
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
@@ -63,6 +63,10 @@ class Run(SQLModel, table=True):
     @property
     def log(self):
         return get_log(self.log_id)
+    
+    @property
+    def task_tag(self):
+        return self.graph.task_tag
 
 class Groph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
@@ -233,7 +237,6 @@ def test_len():
     print(count_rows(Run))
 
 if __name__ == "__main__":
-    # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
     # read_graph_from_a_folder("sampo/bflow", groph=True)
-    pass

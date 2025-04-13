@@ -116,19 +116,22 @@ def back(x):
 
 
 async def callopenai(x: str):
-    # HANGING: duplicate reference to image, in logs. 
     print(x)
     parts = re.split(ugly, x)
+    image_set = set()
     content = []
     for i, part in enumerate(parts):
         if i % 2 == 0:
             if part.strip():
                 content.append({"type": "text", "text": part})
         else:
-            print(part)
             buffer = io.BytesIO()
             img = get_image_by_short_hash(part)
-            
+            if part in image_set:
+                content.append({"type": "text", "text": f"<image_{part}>"})
+                continue
+            image_set.add(part)
+            print(part)
 
             max_dim = 2000
             if max(img.width, img.height) > max_dim:

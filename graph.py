@@ -44,7 +44,7 @@ def extract_local_variables(func):
         return result, captured_locals
     return wrapper
 
-def graph_executable(graph_code: str, prompt_code: str):
+def get_graph_executable(graph_code: str, prompt_code: str):
     graph_code += '\n' + prompt_code
     namespace = {}
     exec(graph_code, namespace)
@@ -65,7 +65,7 @@ async def llm_as_judge(output, answer):
     return int(response[-1]), prompt, response
 
 async def run_(graph: Graph, task: Task):
-    graph_executable = graph_executable(graph.graph, graph.prompt)
+    graph_executable = get_graph_executable(graph.graph, graph.prompt)
     output, localvar = await graph_executable(task.task)
     print(output)
     localvar['__OUTPUT__'] = output
@@ -104,10 +104,10 @@ async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
         graph_id = graph.id
     else:
         graphs = get_graph_stat()
-        graph_id = random.choices(graphs.keys(), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()], k=1)[0]
+        graph_id = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()], k=1)[0]
     
     tasks = get_task_stat()
-    task_id = random.choices(tasks.keys(), weights=[(0.4 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
+    task_id = random.choices(list(tasks.keys()), weights=[(0.4 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
 
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
@@ -123,9 +123,10 @@ def extract_xml(str) -> dict:
     return {child.tag: child.text for child in root}
 
 def ron_(groph: Groph, runs: list[Run]):
-    opti_executable = graph_executable(groph.graph, groph.prompt)
-    print(opti_executable)
-    output, localvar = asyncio.run(opti_executable(runs))
+    groph_executable = graph_executable(groph.graph, groph.prompt)
+    print(groph_executable)
+    output, localvar = asyncio.run(groph_executable(runs))
+
     o_dic = extract_xml(output)
     new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
     go(Ron(groph_id=groph.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
@@ -173,5 +174,12 @@ async def run_graph_42():
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    test_who_to_optize()
-    # asyncio.run(run_graph_42())
+    # a = read_graph_from_a_folder("sampo/bflow", groph=True)
+    # for i in range(10):
+    #     print(f"ROUND {i}")
+    #     for _ in range(10):
+    #         let_us_pick()
+    #     he = who_to_optimize()
+    #     ron_(a, [he])
+    # test_who_to_optize()
+    asyncio.run(run_graph_42())
