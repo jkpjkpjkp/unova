@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log
 import os
-from experiment_store import Graph, Task, engine, Run, go, Opti, Ron, read_graph_from_a_folder
+from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -76,24 +76,10 @@ async def run_(graph: Graph, task: Task):
     return correct
 
 def get_graph_runs() -> dict[bytes, dict[bytes, list[Run]]]:
-    with Session(engine) as session:
-        runs = session.select(Run).all()
-        graphs = session.select(Graph).all()
-    graph_stat = {g.id: {} for g in graphs}
-    for run in runs:
-        if run.task_id not in graph_stat[run.graph_id]:
-            graph_stat[run.graph_id][run.task_id] = []
-        graph_stat[run.graph_id][run.task_id].append(run)
+    return gett(Run, Graph, Task)
 
-def get_graph_opti() -> dict[bytes, list[Opti]]:
-    with Session(engine) as session:
-        optis = session.select(Opti).all()
-        graphs = session.select(Graph).all()
-    graph_stat = {g.id: [] for g in graphs}
-    for opti in optis:
-        for graph in opti.graphs():
-            graph_stat[graph.id].append(opti)
-    return graph_stat
+def get_graph_rons() -> dict[bytes, list[Ron]]:
+    return get(Ron, Graph)
 
 def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     graph_stat = get_graph_runs()
@@ -104,13 +90,7 @@ def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     return graphs
 
 def get_task_runs() -> dict[bytes, list[Run]]:
-    task_stat = {t.id: [] for t in tasks}
-    with Session(engine) as session:
-        runs = session.select(Run).all()
-        tasks = session.select(Task).all()
-    for run in runs:
-        task_stat[run.task_id].append(run.correct)
-    return task_stat
+    return get(Run, Task)
 
 def get_task_stat() -> dict[bytes, tuple[float, int]]:
     task_stat = get_task_runs()
@@ -130,8 +110,8 @@ async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
     task_id = random.choices(tasks.keys(), weights=[(0.4 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
 
     with Session(engine) as session:
-        graph = session.select(Graph).where(Graph.id == graph_id).one()
-        task = session.select(Task).where(Task.id == task_id).one()
+        graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
+        task = session.exec(select(Task).where(Task.id == task_id)).one()
     await run_(graph, task)
 
 
@@ -142,18 +122,19 @@ def extract_xml(str) -> dict:
     root = ET.fromstring(str)
     return {child.tag: child.text for child in root}
 
-def ron_(opti: Opti, runs: list[Run]):
-    opti_executable = graph_executable(opti.graph, opti.prompt)
+def ron_(groph: Groph, runs: list[Run]):
+    opti_executable = graph_executable(groph.graph, groph.prompt)
     output, localvar = asyncio.run(opti_executable(runs))
     o_dic = extract_xml(output)
     new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
-    go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
+    go(Ron(groph_id=groph.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
-def who_to_optimize(tag: Optional[str]) -> Run:
+def who_to_optimize() -> Run:
     graph_runs = get_graph_runs()
     graph_stat = get_graph_stat()
-    graph_opti = get_graph_opti()
-    TODO
+    graph_rons = get_graph_rons()
+    # pick the graph by uct, then pick the easiest task it failed on.
+    
      
 
 async def run_graph_42():

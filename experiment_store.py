@@ -60,11 +60,11 @@ class Run(SQLModel, table=True):
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
 
-class Opti(SQLModel, table=True):
+class Groph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
-    rons: list["Ron"] = Relationship(back_populates="opti")
+    rons: list["Ron"] = Relationship(back_populates="groph")
 
     @property
     def hash(self):
@@ -74,10 +74,10 @@ class Opti(SQLModel, table=True):
 
 class Ron(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
-    opti_id: bytes = Field(foreign_key='opti.id')
+    groph_id: bytes = Field(foreign_key='groph.id')
     log_id: int
     new_graph_id: bytes = Field(foreign_key='graph.id')
-    opti: Opti = Relationship(back_populates='rons')
+    groph: Groph = Relationship(back_populates='rons')
 
     runs: List["Run"] = Relationship(back_populates="rons", link_model=RonRunLink)
 
@@ -119,8 +119,8 @@ def read_opti_from_a_folder(folder: str):
         graph = f.read()
     with open(os.path.join(folder, "prompt.py"), "r") as f:
         prompt = f.read()
-    opti = Opti(graph=graph, prompt=prompt)
-    return go(opti)
+    groph = Groph(graph=graph, prompt=prompt)
+    return go(groph)
 
 def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
@@ -134,10 +134,10 @@ def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
 
 def test_read_opti_from_a_folder():
     with Session(engine) as session:
-        print(len(session.exec(select(Opti)).all()))
+        print(len(session.exec(select(Groph)).all()))
     read_opti_from_a_folder("sampo/bflow")
     with Session(engine) as session:
-        print(len(session.exec(select(Opti)).all()))
+        print(len(session.exec(select(Groph)).all()))
 
 def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
     import polars as pl
@@ -196,17 +196,18 @@ def add_tag_to_task():
 
 def get(ret_type, group_by):
     with Session(engine) as session:
-        ret = session.select(ret_type).all()
-        group = session.select(group_by).all()
-    ret = {g.id: [] for g in group}
-    for r in ret:
-        ret[getattr(r, str(group_by).lower()).id].append(r)
+        aaa = session.exec(select(ret_type)).all()
+        group = session.exec(select(group_by)).all()
+        ret = {g.id: [] for g in group}
+        for r in aaa:
+            print(type(r))
+            ret[getattr(r, group_by.__name__.lower()).id].append(r)
     return ret
 
 def gett(ret_type, group_by1, group_by2):
     with Session(engine) as session:
-        ret = session.select(ret_type).all()
-        group1 = session.select(group_by1).all()
+        ret = session.exec(select(ret_type)).all()
+        group1 = session.exec(select(group_by1)).all()
     ret = {g1.id: {} for g1 in group1}
     for r in ret:
         id1 = getattr(r, str(group_by1).lower()).id
@@ -216,6 +217,10 @@ def gett(ret_type, group_by1, group_by2):
         ret[id1][id2].append(r)
     return ret
 
+def test_get():
+    print(get(Run, Graph))
+
 if __name__ == "__main__":
     # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
-    read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
+    # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
+    test_get()
