@@ -194,6 +194,28 @@ def add_tag_to_task():
             session.merge(task)
         session.commit()
 
+def get(ret_type, group_by):
+    with Session(engine) as session:
+        ret = session.select(ret_type).all()
+        group = session.select(group_by).all()
+    ret = {g.id: [] for g in group}
+    for r in ret:
+        ret[getattr(r, str(group_by).lower()).id].append(r)
+    return ret
+
+def gett(ret_type, group_by1, group_by2):
+    with Session(engine) as session:
+        ret = session.select(ret_type).all()
+        group1 = session.select(group_by1).all()
+    ret = {g1.id: {} for g1 in group1}
+    for r in ret:
+        id1 = getattr(r, str(group_by1).lower()).id
+        id2 = getattr(r, str(group_by2).lower()).id
+        if not id2 in ret[id1]:
+            ret[id1][id2] = []
+        ret[id1][id2].append(r)
+    return ret
+
 if __name__ == "__main__":
     # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
