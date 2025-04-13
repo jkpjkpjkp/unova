@@ -106,21 +106,21 @@ def go(x):
         session.refresh(merged_x)
     return merged_x
 
-def test_graph_insert():
-    g = Graph(graph="import hi", prompt="LO = 'avavav'")
-    go(g)
-    print(g.id)
-
-
 def read_graph_from_a_folder(folder: str):
-    graph_file = os.path.join(folder, "graph.py")
-    prompt_file = os.path.join(folder, "prompt.py")
-    with open(graph_file, "r") as f:
+    with open(os.path.join(folder, "graph.py"), "r") as f:
         graph = f.read()
-    with open(prompt_file, "r") as f:
+    with open(os.path.join(folder, "prompt.py"), "r") as f:
         prompt = f.read()
     graph = Graph(graph=graph, prompt=prompt, task_tag='counting')
     return go(graph)
+
+def read_opti_from_a_folder(folder: str):
+    with open(os.path.join(folder, "graph.py"), "r") as f:
+        graph = f.read()
+    with open(os.path.join(folder, "prompt.py"), "r") as f:
+        prompt = f.read()
+    opti = Opti(graph=graph, prompt=prompt)
+    return go(opti)
 
 def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
@@ -132,14 +132,6 @@ def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
 
-def read_opti_from_a_folder(folder: str):
-    with open(os.path.join(folder, "graph.py"), "r") as f:
-        graph = f.read()
-    with open(os.path.join(folder, "prompt.py"), "r") as f:
-        prompt = f.read()
-    opti = Opti(graph=graph, prompt=prompt)
-    go(opti)
-
 def test_read_opti_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Opti)).all()))
@@ -147,7 +139,7 @@ def test_read_opti_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Opti)).all()))
 
-def read_task_from_a_parquet(filepath: str):
+def read_tasks_from_a_parquet(filepath: str):
     import polars as pl
     from tqdm import tqdm
     from loguru import logger
@@ -164,10 +156,10 @@ def read_task_from_a_parquet(filepath: str):
             continue
         go(task)
 
-def test_read_task_from_a_parquet():
+def test_read_tasks_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
-    read_task_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet")
+    read_tasks_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet")
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
@@ -190,20 +182,3 @@ def check_7(folder: str):
 
 if __name__ == "__main__":
     check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
-    exit()
-    graph = read_graph_from_a_folder("sample/cot")
-    with Session(engine) as session:
-        runs = session.exec(select(Run).where(Run.graph == graph)).all()
-        print(sum(run.correct for run in runs))
-        print(len(runs))
-        tru = {}
-        for run in runs:
-            if not run.task_id in tru:
-                tru[run.task_id] = (0, 0)
-            tru[run.task_id] = (tru[run.task_id][0] + run.correct, tru[run.task_id][1] + 1)
-        print(sum(x[0] / x[1] for x in tru.values()))
-        print(len(tru))
-        for run in runs:
-            print(run.task.answer)
-            print(get_log(run.log_id)['__ANSWER__'])
-        

@@ -1,9 +1,3 @@
-"""
-
-takes in files (code text) and returns executable
-"""
-
-
 import re
 import functools
 import sys
