@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log
 import os
-from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, len
+from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, count_rows
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -96,7 +96,7 @@ def get_task_stat() -> dict[bytes, tuple[float, int]]:
     task_stat = get_task_runs()
     tasks = {}
     for task_id in task_stat:
-        tasks[task_id] = (sum(task_stat[task_id]) + 1, len(task_stat[task_id]) + 2)
+        tasks[task_id] = (sum(x.correct for x in task_stat[task_id]) + 1, len(task_stat[task_id]) + 2)
     return tasks
 
 async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
@@ -124,6 +124,7 @@ def extract_xml(str) -> dict:
 
 def ron_(groph: Groph, runs: list[Run]):
     opti_executable = graph_executable(groph.graph, groph.prompt)
+    print(opti_executable)
     output, localvar = asyncio.run(opti_executable(runs))
     o_dic = extract_xml(output)
     new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
@@ -134,24 +135,23 @@ def who_to_optimize() -> Run:
     graph_stat = get_graph_stat()
     graph_rons = get(Ron, Graph)
     task_stat = get_task_stat()
-    total_rons = len(Ron)
+    total_rons = count_rows(Ron)
     uct_scores = {}
     C = math.sqrt(2)
 
     for graph_id, stat in graph_stat.items():
         num_correct, num_runs = stat
         win_rate = num_correct / num_runs
-        exploration_term = C * math.sqrt(math.log(total_rons) / (len(graph_rons[graph_id]) + 1))
+        exploration_term = C * math.sqrt(math.log(total_rons + 1) / (len(graph_rons[graph_id]) + 1))
         uct_scores[graph_id] = win_rate + exploration_term
 
     best_graph_id = max(uct_scores, key=uct_scores.get)
-    runs_for_best_graph = graph_runs.get(best_graph_id, {})
+    runs_for_best_graph = graph_runs.get(best_graph_id, [])
     
     failed_runs = []
-    for task_id, run_list in runs_for_best_graph.items():
-        for run in run_list:
-            if not run.correct:
-                failed_runs.append(run)
+    for run in runs_for_best_graph:
+        if not run.correct:
+            failed_runs.append(run)
     def get_task_success_rate(run):
         stat = task_stat.get(run.task_id)
         if stat and stat[1] > 0:
@@ -159,14 +159,19 @@ def who_to_optimize() -> Run:
         return 0.0
     return max(failed_runs, key=get_task_success_rate)
 
+def test_who_to_optize():
+    he = who_to_optimize()
+    a = read_graph_from_a_folder("sampo/bflow", groph=True)
+    print(type(a))
+    ron_(a, [he])
+
 async def run_graph_42():
     graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
-    # Read the graph once outside the loop if it's static
     graph = read_graph_from_a_folder(graph_folder)
     tasks = [let_us_pick(graph=graph) for _ in range(42)]
     results = await asyncio.gather(*tasks)
-    # Optional: process results if needed
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    asyncio.run(run_graph_42())
+    test_who_to_optize()
+    # asyncio.run(run_graph_42())

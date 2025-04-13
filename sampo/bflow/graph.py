@@ -1,3 +1,4 @@
+import asyncio
 from experiment_store import Graph, Run
 import re
 
@@ -5,7 +6,8 @@ class Graph:
     def __init__(self, operators: dict, prompt_custom: dict):
         self.custom = operators['Custom']
         self.prompt_custom = prompt_custom
-    def __call__(self, run: list[Run]) -> Graph:
+    async def run(self, run: list[Run]) -> Graph:
+        run = run[0]
         prompt = self.prompt_custom['AFLOW'].format(
             type = run.graph.task_tag,
             graph = run.graph.graph,
@@ -16,7 +18,7 @@ class Graph:
     },""",
             log = run.log,
         )
-        response = self.custom(input=prompt, instruction="")
+        response = await self.custom(input=prompt, instruction="")
         return Graph(
             graph = re.match(r"<graph>(.*?)</graph>", response, re.DOTALL).group(1),
             prompt = re.match(r"<prompt>(.*?)</prompt>", response, re.DOTALL).group(1),

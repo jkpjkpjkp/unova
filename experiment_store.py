@@ -59,6 +59,10 @@ class Run(SQLModel, table=True):
         code = str(self.graph_id) + '\n' + str(self.task_id) + '\n' + str(self.log_id) + '\n' + str(self.correct)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
+    
+    @property
+    def log(self):
+        return get_log(self.log_id)
 
 class Groph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
@@ -106,12 +110,12 @@ def go(x):
         session.refresh(merged_x)
     return merged_x
 
-def read_graph_from_a_folder(folder: str):
+def read_graph_from_a_folder(folder: str, groph: bool = False):
     with open(os.path.join(folder, "graph.py"), "r") as f:
         graph = f.read()
     with open(os.path.join(folder, "prompt.py"), "r") as f:
         prompt = f.read()
-    graph = Graph(graph=graph, prompt=prompt, task_tag='counting')
+    graph = (Graph if not groph else Groph)(graph=graph, prompt=prompt, task_tag='counting')
     return go(graph)
 
 def read_opti_from_a_folder(folder: str):
@@ -206,18 +210,18 @@ def get(ret_type, group_by):
 
 def gett(ret_type, group_by1, group_by2):
     with Session(engine) as session:
-        ret = session.exec(select(ret_type)).all()
+        aaa = session.exec(select(ret_type)).all()
         group1 = session.exec(select(group_by1)).all()
-    ret = {g1.id: {} for g1 in group1}
-    for r in ret:
-        id1 = getattr(r, str(group_by1).lower()).id
-        id2 = getattr(r, str(group_by2).lower()).id
-        if not id2 in ret[id1]:
-            ret[id1][id2] = []
-        ret[id1][id2].append(r)
+        ret = {g1.id: {} for g1 in group1}
+        for r in aaa:
+            id1 = getattr(r, group_by1.__name__.lower()).id
+            id2 = getattr(r, group_by2.__name__.lower()).id
+            if not id2 in ret[id1]:
+                ret[id1][id2] = []
+            ret[id1][id2].append(r)
     return ret
 
-def len(query_type):
+def count_rows(query_type):
     with Session(engine) as session:
         count_statement = select(func.count()).select_from(query_type)
         return session.exec(count_statement).first()
@@ -226,9 +230,10 @@ def test_get():
     print(get(Run, Graph))
 
 def test_len():
-    print(len(Run))
+    print(count_rows(Run))
 
 if __name__ == "__main__":
     # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
-    test_len()
+    # read_graph_from_a_folder("sampo/bflow", groph=True)
+    pass
