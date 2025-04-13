@@ -75,25 +75,18 @@ async def run_(graph: Graph, task: Task):
     go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
     return correct
 
-async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
-    def get_graph_stat() -> dict:
-        graph_stat = {g.id: {} for g in graphs}
-        with Session(engine) as session:
-            runs = session.exec(select(Run)).all()
-            graphs = session.exec(select(Graph)).all()
-        for run in runs:
-            if run.task_id not in graph_stat[run.graph_id]:
-                graph_stat[run.graph_id][run.task_id] = []
-            graph_stat[run.graph_id][run.task_id].append(run.correct)
-    def get_task_stat() -> dict:
-        task_stat = {t.id: [] for t in tasks}
-        with Session(engine) as session:
-            runs = session.exec(select(Run)).all()
-            tasks = session.exec(select(Task)).all()
-        for run in runs:
-            task_stat[run.task_id].append(run.correct)
-    graph_stat = get_graph_stat()
-    task_stat = get_task_stat()
+def get_graph_runs() -> dict:
+    graph_stat = {g.id: {} for g in graphs}
+    with Session(engine) as session:
+        runs = session.exec(select(Run)).all()
+        graphs = session.exec(select(Graph)).all()
+    for run in runs:
+        if run.task_id not in graph_stat[run.graph_id]:
+            graph_stat[run.graph_id][run.task_id] = []
+        graph_stat[run.graph_id][run.task_id].append(run.correct)
+
+def get_graph_stat() -> list[tuple[float, int, bytes]]:
+    graph_stat = get_graph_runs()
     graphs = []
     for graph_id in graph_stat:
         corr = 0
@@ -102,6 +95,19 @@ async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
             corr += sum(graph_stat[graph_id][task_id]) / len(graph_stat[graph_id][task_id])
             tot += 1
         graphs.append((corr+1, tot+2, graph_id))
+    return graphs
+
+def get_task_runs() -> dict:
+    task_stat = {t.id: [] for t in tasks}
+    with Session(engine) as session:
+        runs = session.exec(select(Run)).all()
+        tasks = session.exec(select(Task)).all()
+    for run in runs:
+        task_stat[run.task_id].append(run.correct)
+
+async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
+    task_stat = get_task_runs()
+    graphs = get_graph_stat()
     graph_scores = [(x[0]/x[1]) ** 2 for x in graphs]
     graph_scores = [x / sum(graph_scores) for x in graph_scores]
     graph_id = graph.id if graph else random.choices(graphs, weights=graph_scores, k=1)[0][2]
@@ -132,19 +138,8 @@ def ron_(opti: Opti, runs: list[Run]):
     go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
 def who_to_ron():
-    with Session(engine) as session:
-        runs = session.exec(select(Run).group_by(Run.graph_id)).all()
-        graphs = session.exec(select(Graph)).all()
-        tasks = session.exec(select(Task)).all()
-        rons = session.exec(select(Ron)).all()
-        opts = session.exec(select(Opti)).all()
-    graph_stat = {g.id: {} for g in graphs}
-    task_stat = {t.id: [] for t in tasks}
-    for run in runs:
-        if run.task_id not in graph_stat[run.graph_id]:
-            graph_stat[run.graph_id][run.task_id] = []
-        graph_stat[run.graph_id][run.task_id].append(run.correct)
-        task_stat[run.task_id].append(run.correct)
+    graph_stat = get_graph_runs()
+    task_stat = get_task_runs()
     graph_winrates = {}
     for graph_id in graph_stat:
         corr = 0
