@@ -1,5 +1,5 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
-from sqlalchemy import Column
+from sqlalchemy import Column, func
 from sqlalchemy.types import JSON
 from typing import List, Optional, Tuple
 import hashlib
@@ -217,10 +217,18 @@ def gett(ret_type, group_by1, group_by2):
         ret[id1][id2].append(r)
     return ret
 
+def len(query_type):
+    with Session(engine) as session:
+        count_statement = select(func.count()).select_from(query_type)
+        return session.exec(count_statement).first()
+
 def test_get():
     print(get(Run, Graph))
+
+def test_len():
+    print(len(Run))
 
 if __name__ == "__main__":
     # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
-    test_get()
+    test_len()

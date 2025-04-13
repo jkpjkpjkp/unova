@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log
 import os
-from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett
+from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, len
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -130,12 +130,34 @@ def ron_(groph: Groph, runs: list[Run]):
     go(Ron(groph_id=groph.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
 def who_to_optimize() -> Run:
-    graph_runs = get_graph_runs()
+    graph_runs = get(Run, Graph)
     graph_stat = get_graph_stat()
-    graph_rons = get_graph_rons()
-    # pick the graph by uct, then pick the easiest task it failed on.
+    graph_rons = get(Ron, Graph)
+    task_stat = get_task_stat()
+    total_rons = len(Ron)
+    uct_scores = {}
+    C = math.sqrt(2)
+
+    for graph_id, stat in graph_stat.items():
+        num_correct, num_runs = stat
+        win_rate = num_correct / num_runs
+        exploration_term = C * math.sqrt(math.log(total_rons) / (len(graph_rons[graph_id]) + 1))
+        uct_scores[graph_id] = win_rate + exploration_term
+
+    best_graph_id = max(uct_scores, key=uct_scores.get)
+    runs_for_best_graph = graph_runs.get(best_graph_id, {})
     
-     
+    failed_runs = []
+    for task_id, run_list in runs_for_best_graph.items():
+        for run in run_list:
+            if not run.correct:
+                failed_runs.append(run)
+    def get_task_success_rate(run):
+        stat = task_stat.get(run.task_id)
+        if stat and stat[1] > 0:
+            return stat[0] / stat[1]
+        return 0.0
+    return max(failed_runs, key=get_task_success_rate)
 
 async def run_graph_42():
     graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
