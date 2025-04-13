@@ -1,7 +1,7 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 from sqlalchemy import Column
 from sqlalchemy.types import JSON
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import hashlib
 import os
 from image_shelve import go as img_go, put_log, get_log
@@ -139,21 +139,27 @@ def test_read_opti_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Opti)).all()))
 
-def read_tasks_from_a_parquet(filepath: str):
+def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
     import polars as pl
     from tqdm import tqdm
     from loguru import logger
     df = pl.read_parquet(filepath)
     for row in tqdm(df.iter_rows(named=True)):
-        images = [x['bytes'] for x in row["question_images_decoded"]]
+        images = row[keys[2]]
+        images = [x['bytes'] for x in images] if isinstance(images, list) else [images['bytes']]
         images = img_go(images)
         if isinstance(images, list):
             images = ' '.join(images)
         try:
-            task = Task(task=images + ' ' + row["question_text"], answer=float(row["question_answer"]))
-        except ValueError:
-            logger.warning(f"Error parsing {row['question_text']} {row['question_answer']}")
+            task = Task(task=images + ' ' + row[keys[0]], answer=float(row[keys[1]]))
+        except ValueError as e:
+            logger.warning(f"Error parsing {row[keys[0]]} {row[keys[1]]}: {e}")
             continue
+        task.tags = []
+        if tag:
+            task.tags.append(tag)
+        if tag_key:
+            task.tags.append(row[tag_key])
         go(task)
 
 def test_read_tasks_from_a_parquet():
@@ -189,4 +195,5 @@ def add_tag_to_task():
         session.commit()
 
 if __name__ == "__main__":
-    check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
