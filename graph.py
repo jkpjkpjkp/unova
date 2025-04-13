@@ -75,33 +75,39 @@ async def run_(graph: Graph, task: Task):
     go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
     return correct
 
-def get_graph_runs(tag: Optional[str]) -> dict[bytes, dict[bytes, list[Run]]]:
-    graph_stat = {g.id: {} for g in graphs}
+def get_graph_runs() -> dict[bytes, dict[bytes, list[Run]]]:
     with Session(engine) as session:
-        runs = session.exec(select(Run)).all()
-        graphs = session.exec(select(Graph)).all()
+        runs = session.select(Run).all()
+        graphs = session.select(Graph).all()
+    graph_stat = {g.id: {} for g in graphs}
     for run in runs:
         if run.task_id not in graph_stat[run.graph_id]:
             graph_stat[run.graph_id][run.task_id] = []
-        graph_stat[run.graph_id][run.task_id].append(run.correct)
+        graph_stat[run.graph_id][run.task_id].append(run)
+
+def get_graph_opti() -> dict[bytes, list[Opti]]:
+    with Session(engine) as session:
+        optis = session.select(Opti).all()
+        graphs = session.select(Graph).all()
+    graph_stat = {g.id: [] for g in graphs}
+    for opti in optis:
+        for graph in opti.graphs():
+            graph_stat[graph.id].append(opti)
+    return graph_stat
 
 def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     graph_stat = get_graph_runs()
-    graphs = {}
-    for graph_id in graph_stat:
-        corr = 0
-        tot = 0
-        for task_id in graph_stat[graph_id]:
-            corr += sum(graph_stat[graph_id][task_id]) / len(graph_stat[graph_id][task_id])
-            tot += 1
-        graphs[graph_id] = (corr+1, tot+2)
+    graphs = {graph_id:(
+            sum( sum(x.correct for x in graph_stat[graph_id][task_id])/len(graph_stat[graph_id][task_id]) for task_id in graph_stat[graph_id] ) + 1, 
+            len(graph_stat[graph_id])+2,
+            ) for graph_id in graph_stat}
     return graphs
 
 def get_task_runs() -> dict[bytes, list[Run]]:
     task_stat = {t.id: [] for t in tasks}
     with Session(engine) as session:
-        runs = session.exec(select(Run)).all()
-        tasks = session.exec(select(Task)).all()
+        runs = session.select(Run).all()
+        tasks = session.select(Task).all()
     for run in runs:
         task_stat[run.task_id].append(run.correct)
     return task_stat
@@ -118,14 +124,14 @@ async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
         graph_id = graph.id
     else:
         graphs = get_graph_stat()
-        graph_id = random.choices(graphs.keys(), weights=[(stat[0] / stat[1]) ** 2 for stat in graphs.values()], k=1)[0]
+        graph_id = random.choices(graphs.keys(), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()], k=1)[0]
     
     tasks = get_task_stat()
     task_id = random.choices(tasks.keys(), weights=[(0.4 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
-    
+
     with Session(engine) as session:
-        graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
-        task = session.exec(select(Task).where(Task.id == task_id)).one()
+        graph = session.select(Graph).where(Graph.id == graph_id).one()
+        task = session.select(Task).where(Task.id == task_id).one()
     await run_(graph, task)
 
 
@@ -143,11 +149,10 @@ def ron_(opti: Opti, runs: list[Run]):
     new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
     go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
-def who_to_optimize(tag: Optional[str]) -> list[Run]:
+def who_to_optimize(tag: Optional[str]) -> Run:
     graph_runs = get_graph_runs()
     graph_stat = get_graph_stat()
-    with Session(engine) as session:
-        
+    graph_opti = get_graph_opti()
      
 
 async def run_graph_42():
