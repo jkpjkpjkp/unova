@@ -153,8 +153,8 @@ def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = No
         try:
             task = Task(task=images + ' ' + row[keys[0]], answer=float(row[keys[1]]))
         except ValueError as e:
-            logger.warning(f"Error parsing {row[keys[0]]} {row[keys[1]]}: {e}")
-            continue
+            logger.info(f"None float answer: {row[keys[1]]}")
+            task = Task(task=images + ' ' + row[keys[0]], answer=str(row[keys[1]]))
         task.tags = []
         if tag:
             task.tags.append(tag)

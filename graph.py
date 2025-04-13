@@ -154,9 +154,10 @@ def who_to_ron():
             graph_num_opts[graph.id] += 1
     N_ops = sum(graph_num_opts.values())
     graph = max(graph_winrates, key=lambda x: graph_winrates[x][0] / graph_winrates[x][1] + 2 * math.sqrt(math.log(N_ops) / graph_num_opts[x]))
+    TODO
     
 
-async def main():
+async def run_graph_42():
     graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
     # Read the graph once outside the loop if it's static
     graph = read_graph_from_a_folder(graph_folder)
@@ -166,4 +167,4 @@ async def main():
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run_graph_42())
