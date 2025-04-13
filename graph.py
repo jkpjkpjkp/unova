@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from typing import Tuple
 import random
 import math
-
+from typing import Optional
 
 async def operator_custom(input, instruction):
     prompt = instruction + input
@@ -75,7 +75,7 @@ async def run_(graph: Graph, task: Task):
     go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
     return correct
 
-def get_graph_runs() -> dict:
+def get_graph_runs(tag: Optional[str]) -> dict[bytes, list]:
     graph_stat = {g.id: {} for g in graphs}
     with Session(engine) as session:
         runs = session.exec(select(Run)).all()
@@ -115,7 +115,6 @@ async def let_us_pick(graph: Graph = None) -> Tuple[Graph, Task]:
     for task_id in task_stat:
         tasks.append((sum(task_stat[task_id]) + 1, len(task_stat[task_id]) + 2, task_id))
     task_scores = [(0.4 - x[0]/x[1]) ** 2 for x in tasks]
-    task_scores = [x / sum(task_scores) for x in task_scores]
     task_id = random.choices(tasks, weights=task_scores, k=1)[0][2]
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
@@ -137,25 +136,12 @@ def ron_(opti: Opti, runs: list[Run]):
     new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
     go(Ron(opti_id=opti.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
-def who_to_ron():
-    graph_stat = get_graph_runs()
-    task_stat = get_task_runs()
-    graph_winrates = {}
-    for graph_id in graph_stat:
-        corr = 0
-        tot = 0
-        for task_id in graph_stat[graph_id]:
-            corr += sum(graph_stat[graph_id][task_id]) / len(graph_stat[graph_id][task_id])
-            tot += 1
-        graph_winrates[graph_id] = (corr+1, tot+2)
-    graph_num_opts = {g.id: 0 for g in graphs}
-    for ron in rons:
-        for graph in ron.graphs():
-            graph_num_opts[graph.id] += 1
-    N_ops = sum(graph_num_opts.values())
-    graph = max(graph_winrates, key=lambda x: graph_winrates[x][0] / graph_winrates[x][1] + 2 * math.sqrt(math.log(N_ops) / graph_num_opts[x]))
-    TODO
-    
+def who_to_optimize(tag: Optional[str]) -> list[Run]:
+    graph_runs = get_graph_runs()
+    graph_stat = get_graph_stat()
+    with Session(engine) as session:
+        
+     
 
 async def run_graph_42():
     graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
