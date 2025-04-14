@@ -1,6 +1,6 @@
 import asyncio
 from graph import run_, ron_, get_task_stat
-from experiment_store import engine, Graph, graph, Task, Run, task, read_graph_from_a_folder, get, go
+from experiment_store import engine, Graph, graph, Task, Run, task, get_graph_from_a_folder, get, go
 from sqlmodel import Session
 import itertools
 import random
@@ -12,7 +12,7 @@ def bombarda(run):
         task = run.task
         runs = [run]
         graph_ids = []
-        relentless = read_graph_from_a_folder('sampo/bflow', groph=True)
+        relentless = get_graph_from_a_folder('sampo/bflow', groph=True)
         for _ in range(100):
             print('LEN: ', len(runs))
             ron = ron_(relentless, [runs[0]])
@@ -27,7 +27,7 @@ def test_bob():
     ts = get_task_stat()
     ts = {k for k, v in ts.items() if v[0] == 1 and v[1] > 2 }
 
-    cot_graph = read_graph_from_a_folder('sample/basic')
+    cot_graph = get_graph_from_a_folder('sample/basic')
     tss = get(Run, Graph)[cot_graph.id]
 
     for t in tss:
@@ -46,7 +46,7 @@ def merge(graph1, graph2):
     run1 = runs[graph1.id]
     run2 = runs[graph2.id]
     tasks = set([x.task_id for x in itertools.chain(run1, run2) if not x.correct])
-    merg = read_graph_from_a_folder('sampo/merger', groph=True)
+    merg = get_graph_from_a_folder('sampo/merger', groph=True)
     go(merg)
     for _ in tqdm(range(100)):
         ron = ron_(merg, [run1[0], run2[0]])
@@ -62,5 +62,5 @@ def merge(graph1, graph2):
             break
 
 if __name__ == '__main__':
-    # test_bob()
-    merge(read_graph_from_a_folder('sample/basic'), read_graph_from_a_folder('/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7'))
+    test_bob()
+    # merge(get_graph_from_a_folder('sample/basic'), get_graph_from_a_folder('/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7'))

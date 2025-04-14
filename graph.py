@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log, model
 import os
-from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, count_rows, tag, graph as graph_, task as task_
+from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, get_graph_from_a_folder, get, gett, count_rows, tag, graph as graph_, task as task_
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -143,10 +143,8 @@ def extract_xml(str) -> dict:
 
 def ron_(groph: Groph, runs: list[Run]):
     groph_executable = get_graph_executable(groph.graph, groph.prompt)
-    output, localvar = asyncio.run(groph_executable(runs))
-
-    o_dic = extract_xml(output)
-    new_graph = go(Graph(graph=o_dic['graph'], prompt=o_dic['prompt']))
+    graph, localvar = asyncio.run(groph_executable(runs))
+    new_graph = go(graph)
     go(Ron(groph_id=groph.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
 def who_to_optimize() -> Run:
@@ -180,20 +178,20 @@ def who_to_optimize() -> Run:
 
 def test_who_to_optize():
     he = who_to_optimize()
-    a = read_graph_from_a_folder("sampo/bflow", groph=True)
+    a = get_graph_from_a_folder("sampo/bflow", groph=True)
     ron_(a, [he])
 
 async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
     # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
     graph_folder = "sample/basic"
-    graph = read_graph_from_a_folder(graph_folder)
+    graph = get_graph_from_a_folder(graph_folder)
     tasks = [await let_us_pick(graph=graph) for _ in range(times)]
     results = await asyncio.gather(*[run_(graph, task, judgement=judgement) for graph, task in tasks])
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
     asyncio.run(run_graph_42(times=42, judgement='rule', tag='mmiq'))
-    # a = read_graph_from_a_folder("sampo/bflow", groph=True)
+    # a = get_graph_from_a_folder("sampo/bflow", groph=True)
     # for i in range(10):
     #     print(f"ROUND {i}")
     #     asyncio.run(run_graph_42(times=21))
