@@ -1,6 +1,6 @@
 import asyncio
 from graph import run_, ron_, get_task_stat
-from experiment_store import engine, Graph, graph, Task, Run, task, read_groph_from_a_folder, read_graph_from_a_folder, get
+from experiment_store import engine, Graph, graph, Task, Run, task, read_graph_from_a_folder, get
 from sqlmodel import Session
 
 def bombarda(run):
@@ -8,12 +8,12 @@ def bombarda(run):
         session.add(run)
         graph_orig = run.graph
         task = run.task
-        runs = []
+        runs = [run]
         graph_ids = []
-        relentless = read_groph_from_a_folder('sampo/relentless')
+        relentless = read_graph_from_a_folder('sampo/bflow', groph=True)
         for _ in range(100):
             print('LEN: ', len(runs))
-            ron = ron_(relentless, runs[0])
+            ron = ron_(relentless, [runs[0]])
             graph_ids.append(ron.new_graph_id)
             graph_ = graph(ron.new_graph_id)
             run = run_(graph_, task)
@@ -38,3 +38,10 @@ if __name__ == '__main__':
     
 
     print(len(ts))
+
+
+def merge(graph1, graph2):
+    with Session(engine) as session:
+        session.add(graph1)
+        session.add(graph2)
+        TODO

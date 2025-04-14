@@ -130,7 +130,7 @@ def extract_xml(str) -> dict:
     return {child.tag: child.text for child in root}
 
 def ron_(groph: Groph, runs: list[Run]):
-    groph_executable = graph_executable(groph.graph, groph.prompt)
+    groph_executable = get_graph_executable(groph.graph, groph.prompt)
     print(groph_executable)
     output, localvar = asyncio.run(groph_executable(runs))
 

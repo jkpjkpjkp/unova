@@ -1,7 +1,7 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 from sqlalchemy import Column, func
 from sqlalchemy.types import JSON
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Type
 import hashlib
 import os
 from image_shelve import go as img_go, put_log, get_log
@@ -153,25 +153,15 @@ def read_graph_from_a_folder(folder: str, groph: bool = False):
     graph = (Graph if not groph else Groph)(graph=graph, prompt=prompt, task_tag='counting')
     return go(graph)
 
+def get_by_id(ret_type, id: bytes):
+    with Session(engine) as session:
+        return session.exec(select(ret_type).where(ret_type.id == id)).first()
 def graph(graph_id):
-    with Session(engine) as session:
-        return session.exec(select(Graph).where(Graph.id == graph_id)).first()
+    return get_by_id(Graph, graph_id)
 def task(task_id):
-    with Session(engine) as session:
-        return session.exec(select(Task).where(Task.id == task_id)).first()
+    return get_by_id(Task, task_id)
 
-def read_groph_from_a_folder(folder: str):
-    with open(os.path.join(folder, "graph.py"), "r") as f:
-        graph = f.read()
-    with open(os.path.join(folder, "prompt.py"), "r") as f:
-        prompt = f.read()
-    groph = Groph(graph=graph, prompt=prompt)
-    return go(groph)
-
-def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
-    with Session(engine) as session:
-        session.exec(delete(Graph))
-        session.commit()
+def test_read_graph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
     read_graph_from_a_folder("sample/cot")
@@ -181,7 +171,7 @@ def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
 def test_read_groph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Groph)).all()))
-    read_groph_from_a_folder("sampo/bflow")
+    read_graph_from_a_folder("sampo/bflow", groph=True)
     with Session(engine) as session:
         print(len(session.exec(select(Groph)).all()))
 
@@ -215,7 +205,7 @@ def test_read_tasks_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
-def check_7(folder: str):
+def print_graph_stat(folder: str):
     graph = read_graph_from_a_folder(folder)
     with Session(engine) as session:
         runs = session.exec(select(Run).where(Run.graph == graph)).all()
@@ -234,17 +224,13 @@ def check_7(folder: str):
             print(run.task.answer)
             print(get_log(run.log_id)['__ANSWER__'])
 
-def add_tag_to_task():
+def DANGER_test_add_tag_to_task():
     with Session(engine) as session:
         tasks = session.exec(select(Task)).all()
         for task in tasks:
             task.tags = ['zerobench']
             session.merge(task)
         session.commit()
-
-def get_by_id(ret_type, id: bytes):
-    with Session(engine) as session:
-        return session.exec(select(ret_type).where(ret_type.id == id)).first()
 
 def get(ret_type, group_by):
     with Session(engine) as session:
@@ -281,7 +267,7 @@ def test_len():
     print(count_rows(Run))
 
 if __name__ == "__main__":
-    # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
-    check_7("sample/basic")
+    # print_graph_stat("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    print_graph_stat("sample/basic")
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
     # read_graph_from_a_folder("sampo/bflow", groph=True)
