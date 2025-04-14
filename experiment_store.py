@@ -30,6 +30,11 @@ class Graph(SQLModel, table=True):
     def score(self):
         runs = gett(Run, Graph, Task)[self.id]
         return (sum(sum(run.correct for run in runs[task.id]) / len(runs[task.id]) for task in runs) + 1) / (len(runs) + 2)
+    
+    @property
+    def tags(self):
+        return [self.task_tag]
+
 class Task(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
@@ -208,10 +213,12 @@ def check_7(folder: str):
         print(len(runs))
         tru = {}
         for run in runs:
+            question = run.task.task.lower()
             if not run.task_id in tru:
                 tru[run.task_id] = (0, 0)
             tru[run.task_id] = (tru[run.task_id][0] + run.correct, tru[run.task_id][1] + 1)
         print(sum(x[0] / x[1] for x in tru.values()))
+        print(sum(int(bool(x[0])) for x in tru.values()))
         print(len(tru))
         for run in runs:
             print(run.task.answer)

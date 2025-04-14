@@ -104,10 +104,10 @@ async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
         graph_id = graph.id
     else:
         graphs = get_graph_stat()
-        graph_id = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()], k=1)[0]
+        graph_id = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()])[0]
     
     tasks = get_task_stat()
-    task_id = random.choices(list(tasks.keys()), weights=[(0.4 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
+    task_id = random.choices(list(tasks.keys()), weights=[0.25 -(0.5 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
 
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
@@ -167,7 +167,8 @@ def test_who_to_optize():
     ron_(a, [he])
 
 async def run_graph_42():
-    graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
+    # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
+    graph_folder = "sample/basic"
     graph = read_graph_from_a_folder(graph_folder)
     tasks = [let_us_pick(graph=graph) for _ in range(42)]
     results = await asyncio.gather(*tasks)
