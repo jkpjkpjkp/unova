@@ -11,36 +11,28 @@ import openai
 import os
 import argparse
 import asyncio
+import uuid
+import json
+import fcntl
 model = "gemini-2.0-pro-exp-02-05"
 
 
-log_shelve = shelve.open('log.shelve')
-tot_log = len(log_shelve.keys())
-tot_log_lock = Lock()
 
 def put_log(log: dict):
-    global tot_log
-    with tot_log_lock:
-        tot_log += 1
-        local_tot = tot_log
-    log_shelve[str(local_tot)] = log
-    return local_tot
+    with shelve.open('log.shelve') as log_shelve:
+        key = str(uuid.uuid4())
+        log_shelve[key] = log
+    return key
 
-def get_log(log_id: int):
-    return log_shelve[str(log_id)]
+def get_log(log_id: str):
+    with shelve.open('log.shelve') as log_shelve:
+        return log_shelve[log_id]
 
-if __name__ == "__main__":
-    print(tot_log)
-    exit()
-
-short_hash_to_image = shelve.open('image.shelve')
+_short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')
 
-tot = len(long_hash_to_short_hash.keys())
-tot_lock = Lock()
-
 def get_image_by_short_hash(short_hash):
-    ret = short_hash_to_image[short_hash]
+    ret = _short_hash_to_image[short_hash]
     if not hasattr(ret, 'filename'):
         ret.filename = ""
     return ret.convert('RGB')
@@ -55,18 +47,25 @@ def int_to_0aA(i):
         i //= 62
     return s
 
+# if __name__ == "__main__":
+#     print(tot)
+#     print(len(set(long_hash_to_short_hash.values())))
+#     exit()
+
 def _img_go(image: Image.Image):
-    global tot
     image = image.convert('RGB')
     long_hash = hashlib.sha256(image.tobytes()).hexdigest()
-    if long_hash not in long_hash_to_short_hash or not long_hash_to_short_hash[long_hash]:
-        with tot_lock:
-            tot += 1
-            local_tot = tot
-        short_hash = int_to_0aA(local_tot)
-        long_hash_to_short_hash[long_hash] = short_hash
-        short_hash_to_image[short_hash] = image
-    return long_hash_to_short_hash[long_hash]
+    if long_hash in long_hash_to_short_hash and long_hash_to_short_hash[long_hash]:
+        return long_hash_to_short_hash[long_hash]
+    with fcntl.flock(fcntl.open('.image_count', fcntl.O_RDWR), fcntl.LOCK_EX):
+        with open('.image_count', 'r+') as f:
+            tot = int(f.read()) + 1
+            f.seek(0)
+            f.write(str(tot))
+    short_hash = int_to_0aA(tot)
+    long_hash_to_short_hash[long_hash] = short_hash
+    _short_hash_to_image[short_hash] = image
+    return short_hash
 
 pretty = '<image_{short_hash}>'
 ugly = r'<image_([a-zA-Z0-9]{1,10}?)>'
@@ -115,31 +114,11 @@ def back(x):
         return x
 
 
-class ImageFolder:
-    def __init__(self, x: str):
-        self.hashes = re.split(ugly, x)[1::2]
-        self.images = [get_image_by_short_hash(part) for part in self.hashes]
-
-    def __getitem__(self, i):
-        if isinstance(i, slice) or isinstance(i, int) and i < len(self.images):
-            return self.images[i]
-        elif isinstance(i, str):
-            if '<image_' in i:
-                i = re.search(ugly, i).group(1)
-            return get_image_by_short_hash(i)
-        else:
-            raise ValueError(f"Invalid index: {i}")
-    
-    def __len__(self):
-        return len(self.images)
-
-def extract_image_from_text(text: str):
-    return ImageFolder(text)
 
 async def callopenai(x: str):
     print(x)
     parts = re.split(ugly, x)
-    image_set = set()
+    image_set = []
     content = []
     for i, part in enumerate(parts):
         if i % 2 == 0:
@@ -151,7 +130,7 @@ async def callopenai(x: str):
             if part in image_set:
                 content.append({"type": "text", "text": f"<image_{part}>"})
                 continue
-            image_set.add(part)
+            image_set.append(part)
             print(part)
 
             max_dim = 2000
@@ -167,14 +146,110 @@ async def callopenai(x: str):
                 "type": "image_url",
                 "image_url": {"url": f"data:image/png;base64,{base64_data}"}
             })
+            content.append({"type": "text", "text": f"<image_{part}>"})
     
-    return openai.chat.completions.create(
+    def retrieve(image_id):
+        idc = re.match("image_(\d+)", image_id)
+        if idc:
+            image_id = int(idc.group(1)) - 1
+            return get_image_by_short_hash(image_set[image_id])
+        hs = re.match(ugly, image_id)
+        if hs:
+            return get_image_by_short_hash(hs.group(1))
+        try:
+            image_id = int(image_id)
+            return image_set[image_id]
+        except:
+            pass
+        return image_set[0]
+    
+    def crop(image_id=0, x1=0, y1=0, x2=1000, y2=1000):
+        image = retrieve(image_id)
+        image_dims = image.size
+        x1 = x1 / 1000 * image_dims[0]
+        y1 = y1 / 1000 * image_dims[1]
+        x2 = x2 / 1000 * image_dims[0]
+        y2 = y2 / 1000 * image_dims[1]
+        return image.crop((x1, y1, x2, y2))
+    
+    if image_set:
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "crop",
+                    "description": "Crop an image",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "image_id": {"type": "string", "description": f"use 'image_1' to refer to the 1st image, or its representation, '<image_{image_set[0]}>'"},
+                            "x1": {"type": "number", "description": "coordinates are from 0 to 1000"},
+                            "y1": {"type": "number"},
+                            "x2": {"type": "number"},
+                            "y2": {"type": "number", "description": "coordinates are from 0 to 1000"},
+                        },
+                        "required": ["x1", "y1", "x2", "y2"]
+                    }
+                }
+            }
+        ]
+    else:
+        tools = []
+
+    messages=[{
+        'role': 'user',
+        'content': content
+    }]
+
+    response = openai.chat.completions.create(
         model=model,
-        messages=[{
-            'role': 'user',
-            'content': content
-        }],
-    ).choices[0].message.content
+        messages=messages,
+        tools=tools,
+        tool_choice="auto"
+    )
+
+    while response.choices[0].message.tool_calls:
+        messages.append({
+            "role": "assistant",
+            "content": response.choices[0].message.content,
+            "tool_calls": [tool_call]
+        })
+        tool_call = response.choices[0].message.tool_calls[0]
+        func_name = tool_call.function.name
+        if func_name == "crop":
+            args = json.loads(tool_call.function.arguments)
+            result = crop(**args)
+            repr = img_go(result)
+            buffer = io.BytesIO()
+            result.save(buffer, format="PNG")
+            base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            messages.append({
+                "role": "tool",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{base64_data}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": repr
+                    }
+                ],
+                "tool_call_id": tool_call.id
+            })
+        else:
+            raise ValueError(f"Unknown tool: {func_name}")
+
+        response = openai.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools,
+            tool_choice="auto"
+        )
+    
+    return response.choices[0].message.content
 
 def cli():
     while True:

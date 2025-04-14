@@ -88,9 +88,9 @@ async def llm_as_judge(output, answer):
     try:
         match = re.findall(r"{{(.*?)}}", response)
         extracted_content = match.groups()[-1]
-        assert extracted_content == bool(extracted_content)
+        assert extracted_content == int(bool(extracted_content))
     except:
-        print("No scoring found in {response}")
+        print(f"No scoring found in {response}")
         extracted_content = 0
     return extracted_content, prompt, response
 
@@ -205,7 +205,7 @@ async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    asyncio.run(run_graph_42(times=42, judgement='rule', tag='mmiq'))
+    asyncio.run(run_graph_42(times=2, judgement='llm', tag='zerobench'))
     # a = get_graph_from_a_folder("sampo/bflow", groph=True)
     # for i in range(10):
     #     print(f"ROUND {i}")

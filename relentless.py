@@ -54,12 +54,13 @@ async def merge(graph1, graph2):
         new_graph = ron.new_graph
         go(new_graph)
         tasks = random.sample(tasks, 3)
-        sum = 0
-        for task in tasks:
-            run = run_(new_graph, task)
+        sum_correct = 0
+        for task_id in tasks:
+            current_task = task(task_id)
+            run = await run_(new_graph, current_task)
             go(run)
-            sum += run.correct
-        if sum == 3:
+            sum_correct += run.correct
+        if sum_correct == 3:
             break
 
 if __name__ == '__main__':
