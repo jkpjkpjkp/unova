@@ -192,7 +192,7 @@ async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    asyncio.run(run_graph_42(times=2, judgement='rule', tag='mmiq'))
+    asyncio.run(run_graph_42(times=42, judgement='rule', tag='mmiq'))
     # a = read_graph_from_a_folder("sampo/bflow", groph=True)
     # for i in range(10):
     #     print(f"ROUND {i}")

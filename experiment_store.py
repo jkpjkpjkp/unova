@@ -30,7 +30,7 @@ class Graph(SQLModel, table=True):
     @property
     def score(self):
         runs = gett(Run, Graph, Task)[self.id]
-        return (sum(sum(run.correct for run in runs[task.id]) / len(runs[task.id]) for task in runs) + 1) / (len(runs) + 2)
+        return (sum(sum(run.correct for run in task) / len(task) for task in runs) + 1) / (len(runs) + 2)
     
     @property
     def tags(self):
