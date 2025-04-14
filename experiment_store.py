@@ -19,7 +19,7 @@ class Graph(SQLModel, table=True):
     def hash(self):
         self.graph = self.graph.strip(' \n')
         self.prompt = self.prompt.strip(' \n')
-        code = self.graph + '\n' + self.prompt + '\n' + self.task_tag
+        code = self.graph + '\n' + self.prompt + '\n' + (self.task_tag or '')
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
     

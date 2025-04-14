@@ -17,6 +17,8 @@ async def operator_custom(input, instruction=""):
     response = await callopenai(prompt)
     return response
 
+
+
 async def operator_crop(input, instruction="please indicate cropped area by (x1, y1, x2, y2), each in [0, 1000]"):
     prompt = instruction + input
     response = await callopenai(prompt)

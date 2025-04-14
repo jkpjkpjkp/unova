@@ -115,9 +115,26 @@ def back(x):
         return x
 
 
-def extract_image_from_text(text: str):
-    TODO
+class ImageFolder:
+    def __init__(self, x: str):
+        self.hashes = re.split(ugly, x)[1::2]
+        self.images = [get_image_by_short_hash(part) for part in self.hashes]
 
+    def __getitem__(self, i):
+        if isinstance(i, slice) or isinstance(i, int) and i < len(self.images):
+            return self.images[i]
+        elif isinstance(i, str):
+            if '<image_' in i:
+                i = re.search(ugly, i).group(1)
+            return get_image_by_short_hash(i)
+        else:
+            raise ValueError(f"Invalid index: {i}")
+    
+    def __len__(self):
+        return len(self.images)
+
+def extract_image_from_text(text: str):
+    return ImageFolder(text)
 
 async def callopenai(x: str):
     print(x)
