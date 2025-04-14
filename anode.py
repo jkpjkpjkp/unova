@@ -10,7 +10,7 @@ def xml_compile(field_names: list[str]):
 {example_str}
 """
 
-async def xml_extract(content: str, field_names: list[str], field_types: dict[str, type]) -> dict[str, any]:
+def xml_extract(content: str, field_names: list[str], field_types: dict[str, type]) -> dict[str, any]:
     extracted_data: dict[str, any] = {}
 
     for field_name in field_names:
