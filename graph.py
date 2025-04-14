@@ -17,8 +17,19 @@ async def operator_custom(input, instruction=""):
     response = await callopenai(prompt)
     return response
 
+async def operator_crop(input, instruction="please indicate cropped area by (x1, y1, x2, y2), each in [0, 1000]"):
+    prompt = instruction + input
+    response = await callopenai(prompt)
+    match = re.findall(r"Cropped area: \((.*?), (.*?), (.*?), (.*?)\)", response)
+    if match:
+        x1, y1, x2, y2 = map(int, match[0])
+        return 
+    else:
+        raise Exception("[grok] No cropped area found")
+
 operators_dict = {
     "Custom": operator_custom,
+    "Crop": operator_crop,
 }
 
 
@@ -145,7 +156,7 @@ def ron_(groph: Groph, runs: list[Run]):
     groph_executable = get_graph_executable(groph.graph, groph.prompt)
     graph, localvar = asyncio.run(groph_executable(runs))
     new_graph = go(graph)
-    go(Ron(groph_id=groph.id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
+    go(Ron(groph_id=groph.id, opti_id=runs[0].id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
 
 def who_to_optimize() -> Run:
     graph_runs = get(Run, Graph)

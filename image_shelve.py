@@ -115,6 +115,10 @@ def back(x):
         return x
 
 
+def extract_image_from_text(text: str):
+    TODO
+
+
 async def callopenai(x: str):
     print(x)
     parts = re.split(ugly, x)

@@ -1,5 +1,5 @@
 import asyncio
-from experiment_store import Graph, Run
+from experiment_store import Graph as Graph_, Run
 import re
 import asyncio
 from anode import xml_extract
@@ -11,7 +11,7 @@ class Graph:
         self.custom = operators['Custom']
         self.prompt_custom = prompt_custom
     
-    async def run(self, run: list[Run]) -> Graph:
+    async def run(self, run: list[Run]) -> Graph_:
         assert len(run) == 1
         run = run[0]
         prompt = self.prompt_custom['CORRECT_IT'].format(
@@ -24,7 +24,7 @@ class Graph:
         prompt += self.prompt_custom['CUSTOM_USE']
         response = await self.custom(input=prompt)
         data = xml_extract(response, ['graph', 'prompt'], {'graph': str, 'prompt': str})
-        return Graph(
+        return Graph_(
             graph = data['graph'],
             prompt = data['prompt'],
         )
