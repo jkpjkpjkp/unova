@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 def bombarda(run):
     with Session(engine) as session:
+        session.add(run)
         graph_orig = run.graph
         task = run.task
         runs = []
