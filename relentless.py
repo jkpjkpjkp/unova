@@ -41,7 +41,14 @@ if __name__ == '__main__':
 
 
 def merge(graph1, graph2):
+    runs = get(Run, Graph)
+    runs = [runs[graph1.id][0], runs[graph2.id][0]]
     with Session(engine) as session:
         session.add(graph1)
         session.add(graph2)
-        TODO
+        merg = read_graph_from_a_folder('sampo/merger', groph=True)
+        for _ in range (100):
+            ron = ron_(merg, runs)
+            new_graph = ron.new_graph
+            run_42(new())
+
