@@ -1,6 +1,6 @@
 import asyncio
-from experiment_store import Graph, Run
-from anode import xml_extract
+from experiment_store import Graph as Graph_, Run
+from anode import xml_compile, xml_extract
 import inspect
 from typing import Callable
 class Graph:
@@ -21,7 +21,7 @@ class Graph:
     def _format_experience(self, experience: list[tuple[str, float]]) -> str:
         return "\n".join([f"-Absolutely prohibit {modification}\n (Score: {score})" for modification, score in experience])
 
-    async def run(self, run: list[Run]) -> Graph:
+    async def run(self, run: list[Run]) -> Graph_:
         assert len(run) == 1
         run = run[0]
         prompt = self.prompt_custom['AFLOW'].format(
@@ -34,9 +34,10 @@ class Graph:
             log = run.log,
         )
         prompt += self.prompt_custom['CUSTOM_USE']
+        prompt += xml_compile(['graph', 'prompt'])
         response = await self.custom(input=prompt)
         data = xml_extract(response, ['graph', 'prompt'], {'graph': str, 'prompt': str})
-        return Graph(
+        return Graph_(
             graph = data['graph'],
             prompt = data['prompt'],
             task_tag = run.task_tag,

@@ -47,6 +47,8 @@ def extract_local_variables(func):
 def get_graph_executable(graph_code: str, prompt_code: str):
     graph_code += '\n' + prompt_code
     namespace = {}
+    namespace['__name__'] = '__exec__'
+    namespace['__package__'] = None
     exec(graph_code, namespace)
     Graph = namespace.get("Graph")
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
@@ -141,7 +143,6 @@ def extract_xml(str) -> dict:
 
 def ron_(groph: Groph, runs: list[Run]):
     groph_executable = get_graph_executable(groph.graph, groph.prompt)
-    print(groph_executable)
     output, localvar = asyncio.run(groph_executable(runs))
 
     o_dic = extract_xml(output)
@@ -180,7 +181,6 @@ def who_to_optimize() -> Run:
 def test_who_to_optize():
     he = who_to_optimize()
     a = read_graph_from_a_folder("sampo/bflow", groph=True)
-    print(type(a))
     ron_(a, [he])
 
 async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
