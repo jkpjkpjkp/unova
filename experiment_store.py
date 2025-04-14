@@ -6,6 +6,7 @@ import hashlib
 import os
 from image_shelve import go as img_go, put_log, get_log
 db_name = "main.db"
+tag='zerobench'
 
 class Graph(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
@@ -24,7 +25,7 @@ class Graph(SQLModel, table=True):
     
     @property
     def experience(self):
-        return [(x.modification, x.graph.score) for x in get(Ron, Graph)[self.id]]
+        return [(x.modification, x.graph.score) for x in get(Ron, Graph, tag=tag)[self.id]]
     
     @property
     def score(self):
@@ -38,7 +39,7 @@ class Graph(SQLModel, table=True):
 class Task(SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
-    answer: float
+    answer: str
     tags: list[str] = Field(sa_column=Column(JSON))
 
     runs: list["Run"] = Relationship(back_populates="task")
@@ -232,9 +233,12 @@ def DANGER_test_add_tag_to_task():
             session.merge(task)
         session.commit()
 
-def get(ret_type, group_by):
+def get(ret_type, group_by, tag=None):
     with Session(engine) as session:
-        aaa = session.exec(select(ret_type)).all()
+        if tag:
+            aaa = session.exec(select(ret_type).where(ret_type.tags.contains(tag))).all()
+        else:
+            aaa = session.exec(select(ret_type)).all()
         group = session.exec(select(group_by)).all()
         ret = {g.id: [] for g in group}
         for r in aaa:
@@ -242,7 +246,8 @@ def get(ret_type, group_by):
             ret[getattr(r, group_by.__name__.lower()).id].append(r)
     return ret
 
-def gett(ret_type, group_by1, group_by2):
+def gett(ret_type, group_by1, group_by2, tag=None):
+    # TODO: add tag
     with Session(engine) as session:
         aaa = session.exec(select(ret_type)).all()
         group1 = session.exec(select(group_by1)).all()
@@ -261,13 +266,14 @@ def count_rows(query_type):
         return session.exec(count_statement).first()
 
 def test_get():
-    print(get(Run, Graph))
+    print(get(Run, Graph, tag=tag))
 
 def test_len():
     print(count_rows(Run))
 
 if __name__ == "__main__":
     # print_graph_stat("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
-    print_graph_stat("sample/basic")
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
+
     # read_graph_from_a_folder("sampo/bflow", groph=True)
+    pass

@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log, model
 import os
-from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, count_rows
+from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, count_rows, tag, graph as graph_, task as task_
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -52,6 +52,14 @@ def get_graph_executable(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
+def rule_judge(output, answer):
+    try:
+        match = re.findall(r"{{(.*?)}}", output)
+        output = match.groups()[-1]
+        return output == answer
+    except:
+        return False
+
 async def llm_as_judge(output, answer):
     prompt = f"""
     You are a judge.
@@ -71,22 +79,25 @@ async def llm_as_judge(output, answer):
         extracted_content = 0
     return extracted_content, prompt, response
 
-async def run_(graph: Graph, task: Task):
+async def run_(graph: Graph, task: Task, judgement='llm'):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
     output, localvar = await graph_executable(task.task)
     print(output)
     localvar['__OUTPUT__'] = output
-    correct, prompt, response = await llm_as_judge(output, task.answer)
-    localvar['__LLM_AS_A_JUDGE_PROMPT__'] = prompt
-    localvar['__LLM_AS_A_JUDGE_RESPONSE__'] = response
+    if judgement == 'llm':
+        correct, prompt, response = await llm_as_judge(output, task.answer)
+        localvar['__LLM_AS_A_JUDGE_PROMPT__'] = prompt
+        localvar['__LLM_AS_A_JUDGE_RESPONSE__'] = response
+    elif judgement == 'rule':
+        correct = rule_judge(output, task.answer)
     localvar['__MODEL__'] = model
     return go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct, tags=[model]))
 
 def get_graph_runs() -> dict[bytes, dict[bytes, list[Run]]]:
-    return gett(Run, Graph, Task)
+    return gett(Run, Graph, Task, tag=tag)
 
 def get_graph_rons() -> dict[bytes, list[Ron]]:
-    return get(Ron, Graph)
+    return get(Ron, Graph, tag=tag)
 
 def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     graph_stat = get_graph_runs()
@@ -97,7 +108,7 @@ def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     return graphs
 
 def get_task_runs() -> dict[bytes, list[Run]]:
-    return get(Run, Task)
+    return get(Run, Task, tag=tag)
 
 def get_task_stat() -> dict[bytes, tuple[int, int]]:
     task_stat = get_task_runs()
@@ -116,10 +127,9 @@ async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
     tasks = get_task_stat()
     task_id = random.choices(list(tasks.keys()), weights=[max(0, 3 - x[1])**2 + max(0, 0.3 - x[0]/x[1]) for x in tasks.values()])[0]
 
-    with Session(engine) as session:
-        graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
-        task = session.exec(select(Task).where(Task.id == task_id)).one()
-    await run_(graph, task)
+    graph = graph_(graph_id)
+    task = task_(task_id)
+    return graph, task
 
 
 def extract_xml(str) -> dict:
@@ -173,19 +183,20 @@ def test_who_to_optize():
     print(type(a))
     ron_(a, [he])
 
-async def run_graph_42(times: int = 42):
+async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
     # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
     graph_folder = "sample/basic"
     graph = read_graph_from_a_folder(graph_folder)
-    tasks = [let_us_pick(graph=graph) for _ in range(times)]
-    results = await asyncio.gather(*tasks)
+    tasks = [await let_us_pick(graph=graph) for _ in range(times)]
+    results = await asyncio.gather(*[run_(graph, task, judgement=judgement) for graph, task in tasks])
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    a = read_graph_from_a_folder("sampo/bflow", groph=True)
-    for i in range(10):
-        print(f"ROUND {i}")
-        asyncio.run(run_graph_42(times=21))
-        ron_(a, [who_to_optimize()])
+    asyncio.run(run_graph_42(times=2, judgement='rule', tag='mmiq'))
+    # a = read_graph_from_a_folder("sampo/bflow", groph=True)
+    # for i in range(10):
+    #     print(f"ROUND {i}")
+    #     asyncio.run(run_graph_42(times=21))
+    #     ron_(a, [who_to_optimize()])
     # test_who_to_optize()
     
