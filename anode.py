@@ -1,6 +1,6 @@
 import re
 
-def xml_compile(field_names: list[str]):
+def xml_hint(field_names: list[str]):
     examples = []
     for field_name in field_names:
         examples.append(f"<{field_name}>content</{field_name}>")

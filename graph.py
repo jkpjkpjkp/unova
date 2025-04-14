@@ -154,11 +154,13 @@ def extract_xml(str) -> dict:
     root = ET.fromstring(str)
     return {child.tag: child.text for child in root}
 
-def ron_(groph: Groph, runs: list[Run]):
+async def ron_(groph: Groph, runs: list[Run]):
     groph_executable = get_graph_executable(groph.graph, groph.prompt)
-    graph, localvar = asyncio.run(groph_executable(runs))
+    graph, localvar = await groph_executable(runs)
     new_graph = go(graph)
-    go(Ron(groph_id=groph.id, opti_id=runs[0].id, run_ids=runs, log_id=put_log(dict(localvar)), new_graph_id=new_graph.id))
+    ron_instance = Ron(groph_id=groph.id, run_ids=[x.id for x in runs], log_id=put_log(dict(localvar)), new_graph_id=new_graph.id)
+    print(ron_instance)
+    return go(ron_instance)
 
 def who_to_optimize() -> Run:
     graph_runs = get(Run, Graph)
@@ -192,7 +194,7 @@ def who_to_optimize() -> Run:
 def test_who_to_optize():
     he = who_to_optimize()
     a = get_graph_from_a_folder("sampo/bflow", groph=True)
-    ron_(a, [he])
+    asyncio.run(ron_(a, [he]))
 
 async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
     # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"

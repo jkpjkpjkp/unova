@@ -1,6 +1,6 @@
 import asyncio
 from experiment_store import Graph as Graph_, Run
-from anode import xml_compile, xml_extract
+from anode import xml_hint, xml_extract
 import inspect
 from typing import Callable
 class Graph:
@@ -34,7 +34,7 @@ class Graph:
             log = run.log,
         )
         prompt += self.prompt_custom['CUSTOM_USE']
-        prompt += xml_compile(['graph', 'prompt'])
+        prompt += xml_hint(['graph', 'prompt'])
         response = await self.custom(input=prompt)
         data = xml_extract(response, ['graph', 'prompt'], {'graph': str, 'prompt': str})
         return Graph_(
