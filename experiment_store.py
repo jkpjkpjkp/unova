@@ -40,6 +40,7 @@ class Task(SQLModel, table=True):
     task: str
     answer: float
     tags: list[str] = Field(sa_column=Column(JSON))
+
     runs: list["Run"] = Relationship(back_populates="task")
 
     @property
@@ -62,6 +63,7 @@ class Run(SQLModel, table=True):
     task_id: bytes = Field(foreign_key="task.id")
     log_id: int
     correct: bool
+    tags: list[str] = Field(sa_column=Column(JSON))
 
     graph: Graph = Relationship(back_populates="runs")
     task: Task = Relationship(back_populates="runs")
@@ -102,8 +104,9 @@ class Ron(SQLModel, table=True):
     groph_id: bytes = Field(foreign_key='groph.id')
     log_id: int
     new_graph_id: bytes = Field(foreign_key='graph.id')
-    groph: Groph = Relationship(back_populates='rons')
+    tags: list[str] = Field(sa_column=Column(JSON))
 
+    groph: Groph = Relationship(back_populates='rons')
     runs: List["Run"] = Relationship(back_populates="rons", link_model=RonRunLink)
 
     @property
@@ -150,7 +153,14 @@ def read_graph_from_a_folder(folder: str, groph: bool = False):
     graph = (Graph if not groph else Groph)(graph=graph, prompt=prompt, task_tag='counting')
     return go(graph)
 
-def read_opti_from_a_folder(folder: str):
+def graph(graph_id):
+    with Session(engine) as session:
+        return session.exec(select(Graph).where(Graph.id == graph_id)).first()
+def task(task_id):
+    with Session(engine) as session:
+        return session.exec(select(Task).where(Task.id == task_id)).first()
+
+def read_groph_from_a_folder(folder: str):
     with open(os.path.join(folder, "graph.py"), "r") as f:
         graph = f.read()
     with open(os.path.join(folder, "prompt.py"), "r") as f:
@@ -168,10 +178,10 @@ def DANGER_DANGER_DANGER_test_read_graph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Graph)).all()))
 
-def test_read_opti_from_a_folder():
+def test_read_groph_from_a_folder():
     with Session(engine) as session:
         print(len(session.exec(select(Groph)).all()))
-    read_opti_from_a_folder("sampo/bflow")
+    read_groph_from_a_folder("sampo/bflow")
     with Session(engine) as session:
         print(len(session.exec(select(Groph)).all()))
 
@@ -271,6 +281,7 @@ def test_len():
     print(count_rows(Run))
 
 if __name__ == "__main__":
-    check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    # check_7("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
+    check_7("sample/basic")
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
     # read_graph_from_a_folder("sampo/bflow", groph=True)

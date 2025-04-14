@@ -7,7 +7,7 @@ please put final answer in \boxed{}.
 
 shot1 = r"""
 <demonstration_1>
-Question: <image_1Q> How many kettlebells are there in the image?
+Question: image_1Q; How many kettlebells are there in the image?
 
 Response: 
 Okay, so I am looking at the image inside a gym and the question is for me to count the number of kettlebells. I noticed there are two rows of kettlebells on the top of this front shelf.  I'm focusing on these rows on the upper-middle part of this image. 
@@ -21,7 +21,7 @@ Let me double check. OK, the final answer is \boxed{8}.
 
 shot2 = r"""
 <demonstration_2>
-Question: <image_1L> The chairs are arranged in blocks with an aisle separating them. How many chairs are there in each row in the block the photograph is taken from?
+Question: image_1L; The chairs are arranged in blocks with an aisle separating them. How many chairs are there in each row in the block the photograph is taken from?
 
 Response: 
 Okay, the question asks me how many chairs there are in each row in my block. Let's see.  the row directly before me has five chairs visible. But that is clearly not how many is in each row, for occlusion on each side. Perhaps I should count one that is in the front, so that every chair is in view. Wait, but the chairs in the front rows are really small and I cannot very well tell them from another. Maybe I will choose the fourth row before me where all chairs are clearly visible and not too far away and recognizable. Let me count from left to right and output coordinates: there are one two three four five six seven eight nine 10 11 12 13 chairs (coordinates omitted.) There are 13 chairs in each row in my block. Let me count another row to see if the chairs are indeed rectangular. Let me use the third row in front of me: from left to right, one two three four five six seven eight nine 10 11 12 13, the 13th chair is half visible. okay I think we can conclude that the final answer is \boxed{13} 

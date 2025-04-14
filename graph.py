@@ -1,7 +1,7 @@
 import re
 import functools
 import sys
-from image_shelve import callopenai, put_log
+from image_shelve import callopenai, put_log, model
 import os
 from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, read_graph_from_a_folder, get, gett, count_rows
 from tqdm import tqdm
@@ -57,12 +57,19 @@ async def llm_as_judge(output, answer):
     You are a judge.
     You are given an output and a ground truth answer.
     You need to determine if the output is correct. 
-    End your response with 1 if correct, 0 if incorrect. make sure this number is the final character of your response.
+    put your final scoring in curly braces, like this: {{1}} if correct, {{0}} if incorrect.
     Output: {output}
     Answer: {answer}
     """
     response = await callopenai(prompt)
-    return int(response[-1]), prompt, response
+    try:
+        match = re.findall(r"{{(.*?)}}", response)
+        extracted_content = match.groups()[-1]
+        assert extracted_content == bool(extracted_content)
+    except:
+        print("No scoring found in {response}")
+        extracted_content = 0
+    return extracted_content, prompt, response
 
 async def run_(graph: Graph, task: Task):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
@@ -72,8 +79,8 @@ async def run_(graph: Graph, task: Task):
     correct, prompt, response = await llm_as_judge(output, task.answer)
     localvar['__LLM_AS_A_JUDGE_PROMPT__'] = prompt
     localvar['__LLM_AS_A_JUDGE_RESPONSE__'] = response
-    go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct))
-    return correct
+    localvar['__MODEL__'] = model
+    return go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct, tags=[model]))
 
 def get_graph_runs() -> dict[bytes, dict[bytes, list[Run]]]:
     return gett(Run, Graph, Task)
@@ -92,7 +99,7 @@ def get_graph_stat() -> dict[bytes, tuple[float, int]]:
 def get_task_runs() -> dict[bytes, list[Run]]:
     return get(Run, Task)
 
-def get_task_stat() -> dict[bytes, tuple[float, int]]:
+def get_task_stat() -> dict[bytes, tuple[int, int]]:
     task_stat = get_task_runs()
     tasks = {}
     for task_id in task_stat:
@@ -107,7 +114,7 @@ async def let_us_pick(graph: Optional[Graph] = None) -> Tuple[Graph, Task]:
         graph_id = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()])[0]
     
     tasks = get_task_stat()
-    task_id = random.choices(list(tasks.keys()), weights=[0.25 -(0.5 - x[0]/x[1]) ** 2 for x in tasks.values()])[0]
+    task_id = random.choices(list(tasks.keys()), weights=[max(0, 3 - x[1])**2 + max(0, 0.3 - x[0]/x[1]) for x in tasks.values()])[0]
 
     with Session(engine) as session:
         graph = session.exec(select(Graph).where(Graph.id == graph_id)).one()
@@ -166,21 +173,19 @@ def test_who_to_optize():
     print(type(a))
     ron_(a, [he])
 
-async def run_graph_42():
+async def run_graph_42(times: int = 42):
     # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
     graph_folder = "sample/basic"
     graph = read_graph_from_a_folder(graph_folder)
-    tasks = [let_us_pick(graph=graph) for _ in range(42)]
+    tasks = [let_us_pick(graph=graph) for _ in range(times)]
     results = await asyncio.gather(*tasks)
     print(f"Completed {len(results)} tasks.")
 
 if __name__ == "__main__":
-    # a = read_graph_from_a_folder("sampo/bflow", groph=True)
-    # for i in range(10):
-    #     print(f"ROUND {i}")
-    #     for _ in range(10):
-    #         let_us_pick()
-    #     he = who_to_optimize()
-    #     ron_(a, [he])
+    a = read_graph_from_a_folder("sampo/bflow", groph=True)
+    for i in range(10):
+        print(f"ROUND {i}")
+        asyncio.run(run_graph_42(times=21))
+        ron_(a, [who_to_optimize()])
     # test_who_to_optize()
-    asyncio.run(run_graph_42())
+    
