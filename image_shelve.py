@@ -11,22 +11,11 @@ import openai
 import os
 import argparse
 import asyncio
-import uuid
 import json
 import fcntl
 model = "gemini-2.0-pro-exp-02-05"
 
 
-
-def put_log(log: dict):
-    with shelve.open('log.shelve') as log_shelve:
-        key = str(uuid.uuid4())
-        log_shelve[key] = log
-    return key
-
-def get_log(log_id: str):
-    with shelve.open('log.shelve') as log_shelve:
-        return log_shelve[log_id]
 
 _short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('lts.shelve')

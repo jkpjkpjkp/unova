@@ -1,27 +1,29 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 from sqlalchemy import Column, func
 from sqlalchemy.types import JSON
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type, Dict, Any
 import hashlib
 import os
-from image_shelve import go as img_go, put_log, get_log
+from image_shelve import go as img_go
+import json
 db_name = "main.db"
 tag='zerobench'
 
-class Graph(SQLModel, table=True):
+class MyHash:
+    @property
+    def hash(self):
+        code = '\n'.join(str(getattr(self, field)) for field in self._hash_fields)
+        self.id = hashlib.sha256(code.encode('utf-8')).digest()
+        return self.id
+
+class Graph(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
-    task_tag: str
-    runs: list["Run"] = Relationship(back_populates="graph")
+    tags: list[str] = Field(sa_column=Column(JSON))
 
-    @property
-    def hash(self):
-        self.graph = self.graph.strip(' \n')
-        self.prompt = self.prompt.strip(' \n')
-        code = self.graph + '\n' + self.prompt + '\n' + (self.task_tag or '')
-        self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id
+    runs: list["Run"] = Relationship(back_populates="graph")
+    _hash_fields = ('graph', 'prompt')
     
     @property
     def experience(self):
@@ -31,86 +33,58 @@ class Graph(SQLModel, table=True):
     def score(self):
         rund = gett(Run, Graph, Task)[self.id]
         return (sum(sum(run.correct for run in runs) / len(runs) for runs in rund.values()) + 1) / (len(rund) + 2)
-    
-    @property
-    def tags(self):
-        return [self.task_tag]
 
-class Task(SQLModel, table=True):
+
+class Task(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     task: str
     answer: str
     tags: list[str] = Field(sa_column=Column(JSON))
 
     runs: list["Run"] = Relationship(back_populates="task")
-
-    @property
-    def hash(self):
-        code = self.task + f"\\boxed{{{self.answer}}}"
-        self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id
+    _hash_fields = ('task', 'answer')
 
 class RonRunLink(SQLModel, table=True):
     ron_id: Optional[bytes] = Field(default=None, foreign_key="ron.id", primary_key=True)
     run_id: Optional[bytes] = Field(default=None, foreign_key="run.id", primary_key=True)
 
-class Run(SQLModel, table=True):
+class Run(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph_id: bytes = Field(foreign_key="graph.id")
     task_id: bytes = Field(foreign_key="task.id")
-    log_id: int
+    log: Dict[str, Any] = Field(sa_column=Column(JSON))
+    final_output: str | None = Field(default=None)
     correct: bool
     tags: list[str] = Field(sa_column=Column(JSON))
 
     graph: Graph = Relationship(back_populates="runs")
     task: Task = Relationship(back_populates="runs")
     rons: List["Ron"] = Relationship(back_populates="runs", link_model=RonRunLink)
+    _hash_fields = ('graph_id', 'task_id', 'log', 'tags')
 
-    @property
-    def hash(self):
-        code = str(self.graph_id) + '\n' + str(self.task_id) + '\n' + str(self.log_id) + '\n' + str(self.correct)
-        self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id
-    
-    @property
-    def log(self):
-        return get_log(self.log_id)
-    
-    @property
-    def task_tag(self):
-        return self.graph.task_tag
-    
-    @property
-    def experience(self):
-        return self.graph.experience
 
-class Groph(SQLModel, table=True):
+class Groph(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
+    tags: list[str] = Field(sa_column=Column(JSON))
+
     rons: list["Ron"] = Relationship(back_populates="groph")
+    _hash_fields = ('graph', 'prompt')
 
-    @property
-    def hash(self):
-        code = self.graph + '\n' + self.prompt
-        self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id
 
-class Ron(SQLModel, table=True):
+class Ron(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     groph_id: bytes = Field(foreign_key='groph.id')
-    log_id: int
-    new_graph_id: bytes = Field(foreign_key='graph.id')
+    run_ids: list[bytes] = Field(foreign_key='run.id', sa_column=Column(JSON))
+    log: Dict[str, Any] = Field(sa_column=Column(JSON))
+    final_output: bytes = Field(foreign_key='graph.id')
     tags: list[str] = Field(sa_column=Column(JSON))
 
     groph: Groph = Relationship(back_populates='rons')
     runs: List["Run"] = Relationship(back_populates="rons", link_model=RonRunLink)
+    _hash_fields = ('groph_id', 'run_ids', 'log', 'tags')
 
-    @property
-    def hash(self):
-        code = str(self.log_id) + '\n' + str(self.new_graph_id)
-        self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id
     
     @property
     def graphs(self):
@@ -122,10 +96,6 @@ class Ron(SQLModel, table=True):
     @property
     def new_graph(self):
         return get_by_id(Graph, self.new_graph_id)
-    
-    @property
-    def log(self):
-        return get_log(self.log_id)
     
     @property
     def modification(self):
@@ -220,9 +190,9 @@ def print_graph_stat(folder: str):
         print(len(tru))
         for run in runs:
             print(run.task.answer)
-            print(get_log(run.log_id)['__ANSWER__'])
+            print(run.log['__ANSWER__'] if '__ANSWER__' in run.log else 'N/A')
 
-def DANGER_test_add_tag_to_task():
+def DANGER_DANGER_DANGER_test_add_tag_to_task():
     with Session(engine) as session:
         tasks = session.exec(select(Task)).all()
         for task in tasks:
@@ -273,4 +243,4 @@ if __name__ == "__main__":
     # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
 
     # get_graph_from_a_folder("sampo/bflow", groph=True)
-    pass
+    test_get()
