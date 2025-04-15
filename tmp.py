@@ -1,6 +1,10 @@
 import re
 
 if __name__ == "__main__":
+    s = "no"
+    print(s[:3])
+    exit()
+
     output = "The answer is {{123}}."
     match = re.search(r"{{(.*?)}}", output)
     if match:

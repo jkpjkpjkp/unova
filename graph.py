@@ -54,20 +54,12 @@ def get_graph_executable(graph_code: str, prompt_code: str):
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
 
-def rule_judge(output, answer):
-    try:
-        match = re.findall(r"{{(.*?)}}", output)
-        output = match.groups()[-1]
-        return output == answer
-    except:
-        return False
-
-async def llm_as_judge(output, answer):
+async def llm_judge(output, answer):
     prompt = f"""
     You are a judge.
     You are given an output and a ground truth answer.
     You need to determine if the output is correct. 
-    put your final scoring in curly braces, like this: {{1}} if correct, {{0}} if incorrect.
+    put your final judgement in curly braces, like this: {{correct}} or {{incorrect}}.
     Output: {output}
     Answer: {answer}
     """
@@ -75,45 +67,48 @@ async def llm_as_judge(output, answer):
     try:
         match = re.findall(r"{{(.*?)}}", response)
         extracted_content = match.groups()[-1]
-        assert extracted_content == int(bool(extracted_content))
+        assert extracted_content in ['correct', 'incorrect']
     except:
-        print(f"No scoring found in {response}")
-        extracted_content = 0
-    return extracted_content, prompt, response
+        print(f"No verdict found in {response}")
+        extracted_content = 'incorrect'
+    return extracted_content == 'correct', {'llm_judge_response': response}
 
-async def run_(graph: Graph, task: Task, judgement='llm'):
+async def judge(output, answer):
+    try:
+        match = re.findall(r"{{(.*?)}}", output)
+        output = match.groups()[-1]
+        if re.sub(r'\s+', '', output) == re.sub(r'\s+', '', answer):
+            return True, {}
+        elif any(c.isdigit() for c in output):
+            response = await callopenai(f"is output and the answer the same? output: {output}, answer: {answer}. response in only 1 word, 'yes' (they are the same) or 'no'. ")
+            return response.strip().lower()[:3] == 'yes', {'short_judge_response': response}
+        else:
+            return False, {}
+    except Exception as e:
+        print(e)
+        return await llm_judge(output, answer)
+
+
+async def run_(graph: Graph, task: Task):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
     output, localvar = await graph_executable(task.task)
     print(output)
     localvar['__OUTPUT__'] = output
-    if judgement == 'llm':
-        correct, prompt, response = await llm_as_judge(output, task.answer)
-        localvar['__LLM_AS_A_JUDGE_PROMPT__'] = prompt
-        localvar['__LLM_AS_A_JUDGE_RESPONSE__'] = response
-    elif judgement == 'rule':
-        correct = rule_judge(output, task.answer)
-    localvar['__MODEL__'] = model
+    correct, info = await judge(output, task.answer)
+    for k, v in info.items():
+        localvar[k] = v
     return go(Run(graph=graph, task=task, log_id=put_log(dict(localvar)), correct=correct, tags=[model]))
 
-def get_graph_runs() -> dict[bytes, dict[bytes, list[Run]]]:
-    return gett(Run, Graph, Task, tag=tag)
-
-def get_graph_rons() -> dict[bytes, list[Ron]]:
-    return get(Ron, Graph, tag=tag)
-
 def get_graph_stat() -> dict[bytes, tuple[float, int]]:
-    graph_stat = get_graph_runs()
+    graph_stat = gett(Run, Graph, Task, tag=tag)
     graphs = {graph_id:(
             sum( sum(x.correct for x in graph_stat[graph_id][task_id])/len(graph_stat[graph_id][task_id]) for task_id in graph_stat[graph_id] ) + 1, 
             len(graph_stat[graph_id])+2,
             ) for graph_id in graph_stat}
     return graphs
 
-def get_task_runs() -> dict[bytes, list[Run]]:
-    return get(Run, Task, tag=tag)
-
 def get_task_stat() -> dict[bytes, tuple[int, int]]:
-    task_stat = get_task_runs()
+    task_stat = get(Run, Task, tag=tag)
     tasks = {}
     for task_id in task_stat:
         tasks[task_id] = (sum(x.correct for x in task_stat[task_id]) + 1, len(task_stat[task_id]) + 2)

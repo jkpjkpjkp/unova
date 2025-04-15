@@ -231,9 +231,12 @@ def test_get():
 def test_count_rows():
     print(count_rows(Run))
 
-if __name__ == "__main__":
+def all_tests():
     test_get_graph_from_a_folder()
     test_get_groph_from_a_folder()
     test_read_tasks_from_a_parquet()
     test_get()
     test_count_rows()
+
+if __name__ == "__main__":
+    read_tasks_from_a_parquet("/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet", tag='mmiq', tag_key='category', keys=('question_en', 'answer', 'image'))

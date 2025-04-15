@@ -13,11 +13,17 @@ import argparse
 import asyncio
 import json
 import fcntl
-
+from tqdm import tqdm
 
 
 _short_hash_to_image = shelve.open('image.shelve')
-long_hash_to_short_hash = shelve.open('lts.shelve')
+long_hash_to_short_hash = shelve.open('long_to_short.shelve')
+
+
+def build_long_hash_from_short_hash():
+    for short_hash, image in tqdm(_short_hash_to_image.items()):
+        long_hash = hashlib.sha256(image.tobytes()).hexdigest()
+        long_hash_to_short_hash[long_hash] = short_hash
 
 def get_image_by_short_hash(short_hash):
     ret = _short_hash_to_image[short_hash]
