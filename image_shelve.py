@@ -2,7 +2,7 @@ import shelve
 from PIL import Image
 import hashlib
 from multiprocessing import Lock
-from typing import Any, Iterable, Optional, Union, List
+from typing import Any, Iterable, Optional, Union, List, Literal
 import base64
 import binascii
 import io
@@ -13,7 +13,6 @@ import argparse
 import asyncio
 import json
 import fcntl
-model = "gemini-2.0-pro-exp-02-05"
 
 
 
@@ -104,7 +103,7 @@ def back(x):
 
 
 
-async def callopenai(x: str):
+async def callopenai(x: str, model="gemini-2.0-pro-exp-02-05", tools: list[Literal['crop']]=[]):
     print(x)
     parts = re.split(ugly, x)
     image_set = []
@@ -161,8 +160,9 @@ async def callopenai(x: str):
         y2 = y2 / 1000 * image_dims[1]
         return image.crop((x1, y1, x2, y2))
     
-    if image_set:
-        tools = [
+    tools = []
+    if image_set and 'crop' in tools:
+        tools.append(
             {
                 "type": "function",
                 "function": {
@@ -181,9 +181,7 @@ async def callopenai(x: str):
                     }
                 }
             }
-        ]
-    else:
-        tools = []
+        )
 
     messages=[{
         'role': 'user',

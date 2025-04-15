@@ -6,8 +6,10 @@ import hashlib
 import os
 from image_shelve import go as img_go
 import json
+
 db_name = "main.db"
 tag='zerobench'
+
 
 class MyHash:
     @property
@@ -15,6 +17,7 @@ class MyHash:
         code = '\n'.join(str(getattr(self, field)) for field in self._hash_fields)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
+
 
 class Graph(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
@@ -44,9 +47,11 @@ class Task(MyHash, SQLModel, table=True):
     runs: list["Run"] = Relationship(back_populates="task")
     _hash_fields = ('task', 'answer')
 
+
 class RonRunLink(SQLModel, table=True):
     ron_id: Optional[bytes] = Field(default=None, foreign_key="ron.id", primary_key=True)
     run_id: Optional[bytes] = Field(default=None, foreign_key="run.id", primary_key=True)
+
 
 class Run(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
@@ -59,7 +64,7 @@ class Run(MyHash, SQLModel, table=True):
 
     graph: Graph = Relationship(back_populates="runs")
     task: Task = Relationship(back_populates="runs")
-    rons: List["Ron"] = Relationship(back_populates="runs", link_model=RonRunLink)
+    used_in: List["Ron"] = Relationship(back_populates="runs", link_model=RonRunLink)
     _hash_fields = ('graph_id', 'task_id', 'log', 'tags')
 
 
@@ -76,16 +81,14 @@ class Groph(MyHash, SQLModel, table=True):
 class Ron(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     groph_id: bytes = Field(foreign_key='groph.id')
-    run_ids: list[bytes] = Field(foreign_key='run.id', sa_column=Column(JSON))
+    runs: List["Run"] = Relationship(back_populates="used_in", link_model=RonRunLink)
     log: Dict[str, Any] = Field(sa_column=Column(JSON))
     final_output: bytes = Field(foreign_key='graph.id')
     tags: list[str] = Field(sa_column=Column(JSON))
 
     groph: Groph = Relationship(back_populates='rons')
-    runs: List["Run"] = Relationship(back_populates="rons", link_model=RonRunLink)
-    _hash_fields = ('groph_id', 'run_ids', 'log', 'tags')
+    _hash_fields = ('groph_id', 'log', 'tags')
 
-    
     @property
     def graphs(self):
         ret = set()
@@ -100,6 +103,7 @@ class Ron(MyHash, SQLModel, table=True):
     @property
     def modification(self):
         return self.log['modification']
+
 
 engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(engine)
@@ -124,24 +128,6 @@ def get_graph_from_a_folder(folder: str, groph: bool = False):
 def get_by_id(ret_type, id: bytes):
     with Session(engine) as session:
         return session.exec(select(ret_type).where(ret_type.id == id)).first()
-def graph(graph_id):
-    return get_by_id(Graph, graph_id)
-def task(task_id):
-    return get_by_id(Task, task_id)
-
-def test_get_graph_from_a_folder():
-    with Session(engine) as session:
-        print(len(session.exec(select(Graph)).all()))
-    get_graph_from_a_folder("sample/cot")
-    with Session(engine) as session:
-        print(len(session.exec(select(Graph)).all()))
-
-def test_read_groph_from_a_folder():
-    with Session(engine) as session:
-        print(len(session.exec(select(Groph)).all()))
-    get_graph_from_a_folder("sampo/bflow", groph=True)
-    with Session(engine) as session:
-        print(len(session.exec(select(Groph)).all()))
 
 def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
     import polars as pl
@@ -154,22 +140,31 @@ def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = No
         images = img_go(images)
         if isinstance(images, list):
             images = ' '.join(images)
-        try:
-            task = Task(task=images + ' ' + row[keys[0]], answer=float(row[keys[1]]))
-        except ValueError as e:
-            logger.info(f"None float answer: {row[keys[1]]}")
-            task = Task(task=images + ' ' + row[keys[0]], answer=str(row[keys[1]]))
-        task.tags = []
+        tags = []
         if tag:
-            task.tags.append(tag)
+            tags.append(tag)
         if tag_key:
-            task.tags.append(row[tag_key])
-        go(task)
+            tags.append(row[tag_key])
 
+        go(Task(task=images + ' ' + row[keys[0]], answer=str(row[keys[1]]), tags=tags))
+
+
+def test_get_graph_from_a_folder():
+    with Session(engine) as session:
+        print(len(session.exec(select(Graph)).all()))
+    get_graph_from_a_folder("sample/cot")
+    with Session(engine) as session:
+        print(len(session.exec(select(Graph)).all()))
+def test_get_groph_from_a_folder():
+    with Session(engine) as session:
+        print(len(session.exec(select(Groph)).all()))
+    get_graph_from_a_folder("sampo/bflow", groph=True)
+    with Session(engine) as session:
+        print(len(session.exec(select(Groph)).all()))
 def test_read_tasks_from_a_parquet():
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
-    read_tasks_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet")
+    read_tasks_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet", tag='zerobench')
     with Session(engine) as session:
         print(len(session.exec(select(Task)).all()))
 
@@ -200,7 +195,7 @@ def DANGER_DANGER_DANGER_test_add_tag_to_task():
             session.merge(task)
         session.commit()
 
-def get(ret_type, group_by, tag=None):
+def get(ret_type, group_by, tag=None) -> dict[Any, list[Any]]:
     with Session(engine) as session:
         if tag:
             aaa = session.exec(select(ret_type).where(ret_type.tags.contains(tag))).all()
@@ -213,7 +208,7 @@ def get(ret_type, group_by, tag=None):
             ret[getattr(r, group_by.__name__.lower()).id].append(r)
     return ret
 
-def gett(ret_type, group_by1, group_by2, tag=None):
+def gett(ret_type, group_by1, group_by2, tag=None) -> dict[Any, dict[Any, list[Any]]]:
     # TODO: add tag
     with Session(engine) as session:
         aaa = session.exec(select(ret_type)).all()
@@ -227,20 +222,18 @@ def gett(ret_type, group_by1, group_by2, tag=None):
             ret[id1][id2].append(r)
     return ret
 
-def count_rows(query_type):
+def count_rows(table):
     with Session(engine) as session:
-        count_statement = select(func.count()).select_from(query_type)
-        return session.exec(count_statement).first()
+        return session.exec(select(func.count()).select_from(table)).first()
 
 def test_get():
     print(get(Run, Graph, tag=tag))
-
-def test_len():
+def test_count_rows():
     print(count_rows(Run))
 
 if __name__ == "__main__":
-    # print_graph_stat("/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7")
-    # read_tasks_from_a_parquet(["/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet"], tag='mmiq', keys=('question_en', 'answer', 'image'))
-
-    # get_graph_from_a_folder("sampo/bflow", groph=True)
+    test_get_graph_from_a_folder()
+    test_get_groph_from_a_folder()
+    test_read_tasks_from_a_parquet()
     test_get()
+    test_count_rows()

@@ -1,6 +1,6 @@
 import asyncio
 from graph import run_, ron_, get_task_stat
-from experiment_store import engine, Graph, graph, Task, Run, task, get_graph_from_a_folder, get, go
+from db import engine, Graph, Task, Run, get_graph_from_a_folder, get, go, get_by_id
 from sqlmodel import Session
 import itertools
 import random
@@ -18,7 +18,7 @@ async def bombarda(run):
             print('LEN: ', len(runs))
             ron = await ron_(relentless, [runs[0]])
             graph_ids.append(ron.new_graph_id)
-            graph_ = graph(ron.new_graph_id)
+            graph_ = get_by_id(Graph, ron.new_graph_id)
             run = await run_(graph_, task)
             runs.append(run)
             if run.correct:
@@ -37,7 +37,7 @@ def test_bob():
             asyncio.run(bombarda(cot_graph, t.task))
             exit
     
-    asyncio.run(bombarda(asyncio.run(run_(cot_graph, task(list(ts)[0])))))
+    asyncio.run(bombarda(asyncio.run(run_(cot_graph, get_by_id(Task, list(ts)[0])))))
     
 
     print(len(ts))

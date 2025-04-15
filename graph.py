@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai, put_log, model
 import os
-from experiment_store import Graph, Task, engine, Run, go, Groph, Ron, get_graph_from_a_folder, get, gett, count_rows, tag, graph as graph_, task as task_
+from db import Graph, Task, engine, Run, go, Groph, Ron, get_graph_from_a_folder, get, gett, count_rows, tag, graph as graph_, task as task_
 from tqdm import tqdm
 import asyncio
 from sqlmodel import Session, select
@@ -17,21 +17,8 @@ async def operator_custom(input, instruction=""):
     response = await callopenai(prompt)
     return response
 
-
-
-async def operator_crop(input, instruction="please indicate cropped area by (x1, y1, x2, y2), each in [0, 1000]"):
-    prompt = instruction + input
-    response = await callopenai(prompt)
-    match = re.findall(r"Cropped area: \((.*?), (.*?), (.*?), (.*?)\)", response)
-    if match:
-        x1, y1, x2, y2 = map(int, match[0])
-        return 
-    else:
-        raise Exception("[grok] No cropped area found")
-
 operators_dict = {
     "Custom": operator_custom,
-    "Crop": operator_crop,
 }
 
 
