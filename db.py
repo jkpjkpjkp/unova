@@ -105,6 +105,17 @@ class Ron(MyHash, SQLModel, table=True):
 engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(engine)
 
+
+def test_ron_has_runid():
+    with Session(engine) as session:
+        ron = session.exec(select(Ron)).first()
+        print(ron.id)
+        print(ron.runs)
+
+if __name__ == "__main__":
+    test_ron_has_runid()
+    exit()
+
 def DANGER_DANGER_DANGER_trim():  # everything with illegal foreign key (no related main key) is deleted
     with Session(engine) as session:
         stmt = delete(RonRunLink).where(

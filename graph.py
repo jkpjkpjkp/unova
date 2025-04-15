@@ -113,7 +113,7 @@ async def run_(graph: Graph, task: Task):
     correct, info = await judge(output, task.answer)
     for k, v in info.items():
         localvar[k] = v
-    return go(Run(graph=graph, task=task, log=dict(localvar), correct=correct))
+    return go(Run(graph=graph, task=task, log=dict(localvar), correct=correct, final_output=output))
 
 def get_graph_stat() -> dict[bytes, tuple[float, int]]:
     graph_stat = gett(Run, Graph, Task, tag=tag)
@@ -166,8 +166,7 @@ async def ron_(groph: Groph, runs: list[Run]):
             log_str[k] = str(v)
         except:
             pass
-    ron_instance = Ron(groph_id=groph.id, run_ids=[x.id for x in runs], log=log_str, final_output=new_graph.id)
-    return go(ron_instance)
+    return go(Ron(groph_id=groph.id, runs=runs, log=log_str, final_output=new_graph.id))
 
 
 def who_to_optimize() -> Run:
@@ -205,12 +204,12 @@ def test_who_to_optize():
     a = get_graph_from_a_folder("sampo/bflow", groph=True)
     asyncio.run(ron_(a, [he]))
 
-async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
+async def run_graph_42(times: int = 42, tag='zerobench'):
     # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
     graph_folder = "sample/basic"
     graph = get_graph_from_a_folder(graph_folder)
-    tasks = [await let_us_pick(graph=graph) for _ in range(times)]
-    results = await asyncio.gather(*[run_(graph, task, judgement=judgement) for graph, task in tasks])
+    tasks = [await let_us_pick(graph=graph, tag=tag) for _ in range(times)]
+    results = await asyncio.gather(*[run_(graph, task) for graph, task in tasks])
     print(f"Completed {len(results)} tasks.")
 
 async def aflow():

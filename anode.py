@@ -45,3 +45,12 @@ def xml_extract(content: str, field_names: list[str], field_types: dict[str, typ
                     extracted_data[field_name] = {}
 
     return extracted_data
+
+def test_xml():
+    hint = xml_hint(['graph', 'prompt'])
+    print(hint)
+    data = xml_extract(hint, ['graph', 'prompt'], {'graph': str, 'prompt': str})
+    assert data['graph'] == data['prompt'] == 'content'
+
+if __name__ == "__main__":
+    test_xml()
