@@ -17,6 +17,12 @@ class MyHash:
         code = '\n'.join(str(getattr(self, field)) for field in self._hash_fields)
         self.id = hashlib.sha256(code.encode('utf-8')).digest()
         return self.id
+    
+    def __hash__(self):
+        return self.id or self.hash
+    
+    def __eq__(self, other):
+        return self.__hash__() == other.__hash__()
 
 
 class Graph(MyHash, SQLModel, table=True):
@@ -30,11 +36,13 @@ class Graph(MyHash, SQLModel, table=True):
     
     @property
     def experience(self):
-        return [(x.modification, x.graph.score) for x in get(Ron, Graph, tag=tag)[self.id]]
+        return [(x.modification, x.graph.score) for x in get(Ron, Graph, tag=tag)[self]]
     
     @property
     def score(self):
-        rund = gett(Run, Graph, Task)[self.id]
+        rund = get(Run, Graph, Task)[self]
+        if not rund:
+            return 0.5
         return (sum(sum(run.correct for run in runs) / len(runs) for runs in rund.values()) + 1) / (len(rund) + 2)
 
 
@@ -102,12 +110,12 @@ class Ron(MyHash, SQLModel, table=True):
         return self.log['modification']
 
 
-engine = create_engine(f"sqlite:///{db_name}")
-SQLModel.metadata.create_all(engine)
+_engine = create_engine(f"sqlite:///{db_name}")
+SQLModel.metadata.create_all(_engine)
 
 
 def test_ron_has_runid():
-    with Session(engine) as session:
+    with Session(_engine) as session:
         ron = session.exec(select(Ron)).first()
         print(ron.id)
         print(ron.runs)
@@ -117,7 +125,7 @@ if __name__ == "__main__":
     exit()
 
 def DANGER_DANGER_DANGER_trim():  # everything with illegal foreign key (no related main key) is deleted
-    with Session(engine) as session:
+    with Session(_engine) as session:
         stmt = delete(RonRunLink).where(
             ~RonRunLink.ron_id.in_(select(Ron.id)) |
             ~RonRunLink.run_id.in_(select(Run.id))
@@ -140,7 +148,7 @@ def DANGER_DANGER_DANGER_trim():  # everything with illegal foreign key (no rela
 
 def go(x):
     x.id = x.id or x.hash
-    with Session(engine) as session:
+    with Session(_engine) as session:
         merged_x = session.merge(x)
         session.commit()
         session.refresh(merged_x)
@@ -155,7 +163,7 @@ def get_graph_from_a_folder(folder: str, groph: bool = False):
     return go(graph)
 
 def get_by_id(ret_type, id: bytes):
-    with Session(engine) as session:
+    with Session(_engine) as session:
         return session.exec(select(ret_type).where(ret_type.id == id)).first()
 
 def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
@@ -179,27 +187,27 @@ def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = No
 
 
 def test_get_graph_from_a_folder():
-    with Session(engine) as session:
+    with Session(_engine) as session:
         print(len(session.exec(select(Graph)).all()))
     get_graph_from_a_folder("sample/cot")
-    with Session(engine) as session:
+    with Session(_engine) as session:
         print(len(session.exec(select(Graph)).all()))
 def test_get_groph_from_a_folder():
-    with Session(engine) as session:
+    with Session(_engine) as session:
         print(len(session.exec(select(Groph)).all()))
     get_graph_from_a_folder("sampo/bflow", groph=True)
-    with Session(engine) as session:
+    with Session(_engine) as session:
         print(len(session.exec(select(Groph)).all()))
 def test_read_tasks_from_a_parquet():
-    with Session(engine) as session:
+    with Session(_engine) as session:
         print(len(session.exec(select(Task)).all()))
     read_tasks_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet", tag='zerobench')
-    with Session(engine) as session:
+    with Session(_engine) as session:
         print(len(session.exec(select(Task)).all()))
 
 def print_graph_stat(folder: str):
     graph = get_graph_from_a_folder(folder)
-    with Session(engine) as session:
+    with Session(_engine) as session:
         runs = session.exec(select(Run).where(Run.graph == graph)).all()
         print(sum(run.correct for run in runs))
         print(len(runs))
@@ -217,42 +225,43 @@ def print_graph_stat(folder: str):
             print(run.log['__ANSWER__'] if '__ANSWER__' in run.log else 'N/A')
 
 def DANGER_DANGER_DANGER_test_add_tag_to_task():
-    with Session(engine) as session:
+    with Session(_engine) as session:
         tasks = session.exec(select(Task)).all()
         for task in tasks:
             task.tags = ['zerobench']
             session.merge(task)
         session.commit()
 
-def get(ret_type, group_by, tag=None) -> dict[Any, list[Any]]:
-    with Session(engine) as session:
+def get(*args, tag=None):
+    n = len(args)
+    with Session(_engine) as session:
         if tag:
-            aaa = session.exec(select(ret_type).where(ret_type.tags.contains(tag))).all()
+            aaa = session.exec(select(args[0]).where(args[0].tags.contains(tag))).all()
         else:
-            aaa = session.exec(select(ret_type)).all()
-        group = session.exec(select(group_by)).all()
-        ret = {g.id: [] for g in group}
-        for r in aaa:
-            print(type(r))
-            ret[getattr(r, group_by.__name__.lower()).id].append(r)
-    return ret
+            aaa = session.exec(select(args[0])).all()
+        if n == 1:
+            return aaa
+        group1 = session.exec(select(args[1])).all()
+        if n == 2:
+            ret = {g1: [] for g1 in group1}
+            for r in aaa:
+                ret[getattr(r, args[1].__name__.lower())].append(r)
+            return ret
+        group2 = session.exec(select(args[2])).all()
+        if n == 3:
+            ret = {g1.id: {} for g1 in group1}
+            for r in aaa:
+                k1 = getattr(r, args[1].__name__.lower())
+                k2 = getattr(r, args[2].__name__.lower())
+                if not k2 in ret[k1]:
+                    ret[k1][k2] = []
+                ret[k1][k2].append(r)
+            return ret
+        raise ValueError(f"Invalid number of arguments: {n}")
 
-def gett(ret_type, group_by1, group_by2, tag=None) -> dict[Any, dict[Any, list[Any]]]:
-    # TODO: add tag
-    with Session(engine) as session:
-        aaa = session.exec(select(ret_type)).all()
-        group1 = session.exec(select(group_by1)).all()
-        ret = {g1.id: {} for g1 in group1}
-        for r in aaa:
-            id1 = getattr(r, group_by1.__name__.lower()).id
-            id2 = getattr(r, group_by2.__name__.lower()).id
-            if not id2 in ret[id1]:
-                ret[id1][id2] = []
-            ret[id1][id2].append(r)
-    return ret
 
 def count_rows(table):
-    with Session(engine) as session:
+    with Session(_engine) as session:
         return session.exec(select(func.count()).select_from(table)).first()
 
 def test_get():

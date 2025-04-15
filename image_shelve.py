@@ -14,7 +14,7 @@ import asyncio
 import json
 import fcntl
 from tqdm import tqdm
-
+import subprocess
 
 _short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('long_to_short.shelve')
@@ -40,11 +40,6 @@ def int_to_0aA(i):
         s = chars[i % 62] + s
         i //= 62
     return s
-
-# if __name__ == "__main__":
-#     print(tot)
-#     print(len(set(long_hash_to_short_hash.values())))
-#     exit()
 
 def _img_go(image: Image.Image):
     image = image.convert('RGB')
@@ -107,10 +102,16 @@ def back(x):
     else:
         return x
 
+def is_port_occupied(port):
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
 
 
-async def callopenai(x: str, model="gemini-2.0-pro-exp-02-05", tools: list[Literal['crop']]=[]):
+async def callopenai(x: str, tools: list[Literal['crop']]=['crop']):
     print(x)
+    if not is_port_occupied(7912):
+        subprocess.Popen(['cd', '~/Meta', '&&', 'uv', 'run', 'core/router_qwen.py'])
     parts = re.split(ugly, x)
     image_set = []
     content = []

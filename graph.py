@@ -3,14 +3,14 @@ import functools
 import sys
 from image_shelve import callopenai
 import os
-from db import Graph, Task, engine, Run, go, Groph, Ron, get_graph_from_a_folder, get, gett, count_rows, tag, get_by_id
+from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, count_rows
 from tqdm import tqdm
 import asyncio
-from sqlmodel import Session, select
 from typing import Tuple
 import random
 import math
 from typing import Optional
+import argparse
 
 async def operator_custom(input, instruction=""):
     prompt = instruction + input
@@ -105,7 +105,7 @@ async def judge(output, answer):
         return await llm_judge(output, answer)
 
 
-async def run_(graph: Graph, task: Task):
+async def run_(graph: Graph, task: Task, judgement: Optional[str] = None):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
     output, localvar = await graph_executable(task.task)
     print(output)
@@ -113,14 +113,14 @@ async def run_(graph: Graph, task: Task):
     correct, info = await judge(output, task.answer)
     for k, v in info.items():
         localvar[k] = v
-    return go(Run(graph=graph, task=task, log=dict(localvar), correct=correct, final_output=output))
+    return go(Run(graph=graph, task=task, log=dict(localvar), correct=correct))
 
 def get_graph_stat() -> dict[bytes, tuple[float, int]]:
-    graph_stat = gett(Run, Graph, Task, tag=tag)
-    graphs = {graph_id:(
-            sum( sum(x.correct for x in graph_stat[graph_id][task_id])/len(graph_stat[graph_id][task_id]) for task_id in graph_stat[graph_id] ) + 1, 
-            len(graph_stat[graph_id])+2,
-            ) for graph_id in graph_stat}
+    graph_stat = get(Run, Graph, Task, tag=tag)
+    graphs = {graph:(
+            sum( sum(x.correct for x in graph_stat[graph][task_id])/len(graph_stat[graph][task_id]) for task_id in graph_stat[graph] ) + 1, 
+            len(graph_stat[graph])+2,
+            ) for graph in graph_stat}
     return graphs
 
 def test_get_graph_stat():
@@ -129,23 +129,18 @@ def test_get_graph_stat():
 def get_task_stat(tag: Optional[str] = None) -> dict[bytes, tuple[int, int]]:
     task_stat = get(Run, Task, tag=tag)
     tasks = {}
-    for task_id in task_stat:
-        if not tag or tag in get_by_id(Task, task_id).tags:
-            tasks[task_id] = (sum(x.correct for x in task_stat[task_id]) + 1, len(task_stat[task_id]) + 2)
+    for task in task_stat:
+        if not tag or tag in task.tags:
+            tasks[task] = (sum(x.correct for x in task_stat[task]) + 1, len(task_stat[task]) + 2)
     return tasks
 
 async def let_us_pick(graph: Optional[Graph] = None, tag: Optional[str] = None) -> Tuple[Graph, Task]:
-    if graph:
-        graph_id = graph.id
-    else:
+    if not graph:
         graphs = get_graph_stat()
-        graph_id = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()])[0]
+        graph = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()])[0]
     
     tasks = get_task_stat(tag=tag)
-    task_id = random.choices(list(tasks.keys()), weights=[max(0, 3 - x[1])**2 + max(0, 0.3 - x[0]/x[1]) for x in tasks.values()])[0]
-
-    graph = get_by_id(Graph, graph_id)
-    task = get_by_id(Task, task_id)
+    task = random.choices(list(tasks.keys()), weights=[max(0, 3 - x[1])**2 + max(0, 0.3 - x[0]/x[1]) for x in tasks.values()])[0]
     return graph, task
 
 
@@ -204,24 +199,25 @@ def test_who_to_optize():
     a = get_graph_from_a_folder("sampo/bflow", groph=True)
     asyncio.run(ron_(a, [he]))
 
-async def run_graph_42(times: int = 42, tag='zerobench'):
+async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
     # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
     graph_folder = "sample/basic"
     graph = get_graph_from_a_folder(graph_folder)
-    tasks = [await let_us_pick(graph=graph, tag=tag) for _ in range(times)]
-    results = await asyncio.gather(*[run_(graph, task) for graph, task in tasks])
+    tasks = [await let_us_pick(graph=graph) for _ in range(times)]
+    results = await asyncio.gather(*[run_(graph, task, judgement=judgement) for graph, task in tasks])
     print(f"Completed {len(results)} tasks.")
 
-async def aflow():
-    get_graph_from_a_folder('sample/basic')
-    get_graph_from_a_folder('sample/round_7')
+async def aflow(tag: str):
     a = get_graph_from_a_folder('sampo/bflow', groph=True)
     for _ in range(10):
         for _ in range(2):
-            graph, task = await let_us_pick(tag='zerobench')
+            graph, task = await let_us_pick(tag=tag)
             result = await run_(graph, task)
         await ron_(a, [who_to_optimize()])
 
 if __name__ == "__main__":
-    asyncio.run(aflow())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tag", type=str, default=None)
+    args = parser.parse_args()
+    asyncio.run(aflow(args.tag))
     
