@@ -90,11 +90,8 @@ class Ron(MyHash, SQLModel, table=True):
     _hash_fields = ('groph_id', 'log', 'tags')
 
     @property
-    def graphs(self):
-        ret = set()
-        for run in self.runs:
-            ret.add(run.graph)
-        return ret
+    def graph(self):
+        return self.runs[0].graph
 
     @property
     def new_graph(self):
@@ -107,6 +104,27 @@ class Ron(MyHash, SQLModel, table=True):
 
 engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(engine)
+
+def DANGER_DANGER_DANGER_trim():  # everything with illegal foreign key (no related main key) is deleted
+    with Session(engine) as session:
+        stmt = delete(RonRunLink).where(
+            ~RonRunLink.ron_id.in_(select(Ron.id)) |
+            ~RonRunLink.run_id.in_(select(Run.id))
+        )
+        session.execute(stmt)
+
+        stmt = delete(Run).where(
+            ~Run.graph_id.in_(select(Graph.id)) |
+            ~Run.task_id.in_(select(Task.id))
+        )
+        session.execute(stmt)
+
+        stmt = delete(Ron).where(
+            ~Ron.groph_id.in_(select(Groph.id)) |
+            ~Ron.final_output.in_(select(Graph.id))
+        )
+        session.execute(stmt)
+        session.commit()
 
 
 def go(x):
@@ -122,7 +140,7 @@ def get_graph_from_a_folder(folder: str, groph: bool = False):
         graph = f.read()
     with open(os.path.join(folder, "prompt.py"), "r") as f:
         prompt = f.read()
-    graph = (Graph if not groph else Groph)(graph=graph, prompt=prompt, task_tag='counting')
+    graph = (Graph if not groph else Groph)(graph=graph, prompt=prompt)
     return go(graph)
 
 def get_by_id(ret_type, id: bytes):

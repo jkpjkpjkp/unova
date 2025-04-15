@@ -25,8 +25,8 @@ class Graph:
         assert len(run) == 1
         run = run[0]
         prompt = self.prompt_custom['AFLOW'].format(
-            type = run.task_tag,
-            experience = self._format_experience(run.experience),
+            type = 'vqa',
+            # experience = self._format_experience(run.experience),
             graph = run.graph.graph,
             prompt = run.graph.prompt,
             score = run.graph.score,
@@ -40,5 +40,4 @@ class Graph:
         return Graph_(
             graph = data['graph'],
             prompt = data['prompt'],
-            task_tag = run.task_tag,
         )

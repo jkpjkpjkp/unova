@@ -14,7 +14,6 @@ Considering information loss, complex graphs may yield better results, but insuf
 
 Here is a graph and the corresponding prompt (prompt only related to the custom method) that performed excellently in a previous iteration (maximum score is 1). You must make further optimizations and improvements based on this graph. The modified graph must differ from the provided example, and the specific differences should be noted within the <modification>xxx</modification> section.\n
 <sample>
-    <experience>{experience}</experience>
     <modification>(such as:add /delete /modify / ...)</modification>
     <score>{score}</score>
     <graph>{graph}</graph>
