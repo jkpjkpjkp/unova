@@ -19,7 +19,7 @@ class MyHash:
         return self.id
     
     def __hash__(self):
-        return self.id or self.hash
+        return int.from_bytes(self.id or self.hash, 'big')
     
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
@@ -247,9 +247,8 @@ def get(*args, tag=None):
             for r in aaa:
                 ret[getattr(r, args[1].__name__.lower())].append(r)
             return ret
-        group2 = session.exec(select(args[2])).all()
         if n == 3:
-            ret = {g1.id: {} for g1 in group1}
+            ret = {g1: {} for g1 in group1}
             for r in aaa:
                 k1 = getattr(r, args[1].__name__.lower())
                 k2 = getattr(r, args[2].__name__.lower())

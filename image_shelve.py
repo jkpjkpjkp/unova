@@ -196,7 +196,7 @@ async def callopenai(x: str, tools: list[Literal['crop']]=['crop']):
     }]
 
     response = openai.chat.completions.create(
-        model=model,
+        model='dummy',
         messages=messages,
         tools=tools,
         tool_choice="auto"

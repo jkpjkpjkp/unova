@@ -115,7 +115,7 @@ async def run_(graph: Graph, task: Task, judgement: Optional[str] = None):
         localvar[k] = v
     return go(Run(graph=graph, task=task, log=dict(localvar), correct=correct))
 
-def get_graph_stat() -> dict[bytes, tuple[float, int]]:
+def get_graph_stat(tag=None) -> dict[bytes, tuple[float, int]]:
     graph_stat = get(Run, Graph, Task, tag=tag)
     graphs = {graph:(
             sum( sum(x.correct for x in graph_stat[graph][task_id])/len(graph_stat[graph][task_id]) for task_id in graph_stat[graph] ) + 1, 
@@ -126,7 +126,7 @@ def get_graph_stat() -> dict[bytes, tuple[float, int]]:
 def test_get_graph_stat():
     print(len(get_graph_stat()))
 
-def get_task_stat(tag: Optional[str] = None) -> dict[bytes, tuple[int, int]]:
+def get_task_stat(tag=None) -> dict[bytes, tuple[int, int]]:
     task_stat = get(Run, Task, tag=tag)
     tasks = {}
     for task in task_stat:
@@ -134,7 +134,7 @@ def get_task_stat(tag: Optional[str] = None) -> dict[bytes, tuple[int, int]]:
             tasks[task] = (sum(x.correct for x in task_stat[task]) + 1, len(task_stat[task]) + 2)
     return tasks
 
-async def let_us_pick(graph: Optional[Graph] = None, tag: Optional[str] = None) -> Tuple[Graph, Task]:
+async def let_us_pick(graph: Optional[Graph] = None, tag=None) -> Tuple[Graph, Task]:
     if not graph:
         graphs = get_graph_stat()
         graph = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()])[0]
