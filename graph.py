@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai
 import os
-from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, count_rows
+from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, remove, count_rows
 from tqdm import tqdm
 import asyncio
 from typing import Tuple
@@ -107,7 +107,11 @@ async def judge(output, answer):
 
 async def run_(graph: Graph, task: Task, judgement: Optional[str] = None):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
-    output, localvar = await graph_executable(task.task)
+    try:
+        output, localvar = await graph_executable(task.task)
+    except KeyError as e:
+        if 'LOCATE_PROMPT' in str(e):
+            remove(graph)
     print(output)
     localvar['__OUTPUT__'] = output
     correct, info = await judge(output, task.answer)
@@ -210,9 +214,7 @@ async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
 async def aflow(tag: str):
     a = get_graph_from_a_folder('sampo/bflow', groph=True)
     for _ in range(10):
-        for _ in range(2):
-            graph, task = await let_us_pick(tag=tag)
-            result = await run_(graph, task)
+        result = [await run_(a, (await let_us_pick(tag=tag))[1]) for _ in range(2)]
         await ron_(a, [who_to_optimize()])
 
 if __name__ == "__main__":

@@ -258,6 +258,10 @@ def get(*args, tag=None):
             return ret
         raise ValueError(f"Invalid number of arguments: {n}")
 
+def remove(x):
+    with Session(_engine) as session:
+        session.delete(x)
+        session.commit()
 
 def count_rows(table):
     with Session(_engine) as session:
