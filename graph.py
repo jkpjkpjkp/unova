@@ -117,7 +117,14 @@ async def run_(graph: Graph, task: Task):
     correct, info = await judge(output, task.answer)
     for k, v in info.items():
         localvar[k] = v
-    return go(Run(graph=graph, task=task, log=dict(localvar), correct=correct))
+    log_dict = {}
+    for k, v in localvar.items():
+        try:
+            log_dict[k] = str(v)
+        except Exception as e:
+            print(f"Error converting log variable {k} to string: {e}")
+            pass
+    return go(Run(graph=graph, task=task, log=log_dict, correct=correct))
 
 def get_graph_stat(tag=None) -> dict[bytes, tuple[float, int]]:
     graph_stat = get(Run, Graph, Task, tag=tag)
