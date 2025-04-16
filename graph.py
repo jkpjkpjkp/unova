@@ -170,9 +170,12 @@ def extract_xml(str) -> dict:
     root = ET.fromstring(str)
     return {child.tag: child.text for child in root}
 
-async def ron_(groph: Groph, runs: list[Run]):
+async def ron_(groph: Groph, runs: list[Run], tag=None):
     groph_executable = get_graph_executable(groph.graph, groph.prompt)
     graph, localvar = await groph_executable(runs)
+    if not graph.tags:
+        graph.tags = []
+    graph.tags.append(tag)
     new_graph = go(graph)
     log_str = {}
     for k, v in localvar.items():
@@ -180,7 +183,7 @@ async def ron_(groph: Groph, runs: list[Run]):
             log_str[k] = str(v)
         except:
             pass
-    return go(Ron(groph_id=groph.id, runs=runs, log=log_str, final_output=new_graph.id))
+    return go(Ron(groph_id=groph.id, runs=runs, log=log_str, final_output=new_graph.id, tags=[tag]))
 
 
 async def who_to_optimize(tag=None) -> Run:
