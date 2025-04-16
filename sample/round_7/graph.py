@@ -9,7 +9,7 @@ class Graph:
         # self.crop = operators['Crop']
         self.prompt_custom = prompt_custom # Contains LOCATE_PROMPT, VQA_PROMPT, REFINE_VQA_PROMPT
 
-    async def run(self, problem: str) -> dict:
+    async def run(self, problem: str) -> str:
         """
         Answers the visual question using a locate-VQA-refine pipeline.
         1. Identify relevant area/objects.

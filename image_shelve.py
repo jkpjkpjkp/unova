@@ -110,8 +110,6 @@ def is_port_occupied(port):
 
 async def callopenai(x: str, tools: list[Literal['crop']]=['crop']):
     print(x)
-    if not is_port_occupied(7912):
-        subprocess.Popen(['cd', '~/Meta', '&&', 'uv', 'run', 'core/router_qwen.py'])
     parts = re.split(ugly, x)
     image_set = []
     content = []

@@ -105,7 +105,7 @@ async def judge(output, answer):
         return await llm_judge(output, answer)
 
 
-async def run_(graph: Graph, task: Task, judgement: Optional[str] = None):
+async def run_(graph: Graph, task: Task):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
     try:
         output, localvar = await graph_executable(task.task)
@@ -214,7 +214,7 @@ async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
 async def aflow(tag: str):
     a = get_graph_from_a_folder('sampo/bflow', groph=True)
     for _ in range(10):
-        result = [await run_(a, (await let_us_pick(tag=tag))[1]) for _ in range(2)]
+        result = [await run_(*await let_us_pick(tag=tag)) for _ in range(2)]
         await ron_(a, [who_to_optimize()])
 
 if __name__ == "__main__":
