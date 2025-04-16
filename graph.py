@@ -57,7 +57,14 @@ def get_graph_executable(graph_code: str, prompt_code: str):
     namespace = {}
     namespace['__name__'] = '__exec__'
     namespace['__package__'] = None
-    exec(graph_code, namespace)
+    
+    try:
+        exec(graph_code, namespace)
+    except Exception:
+        print("--- Executing graph code ---")
+        print(graph_code)
+        print("--- End graph code ---")
+        raise
     Graph = namespace.get("Graph")
     graph = Graph(operators=operators_dict, prompt_custom=namespace)
     return extract_local_variables(graph.run)
@@ -112,6 +119,7 @@ async def run_(graph: Graph, task: Task):
     except KeyError as e:
         if 'LOCATE_PROMPT' in str(e):
             remove(graph)
+        return None
     print(output)
     localvar['__OUTPUT__'] = output
     correct, info = await judge(output, task.answer)
@@ -175,7 +183,7 @@ async def ron_(groph: Groph, runs: list[Run]):
     return go(Ron(groph_id=groph.id, runs=runs, log=log_str, final_output=new_graph.id))
 
 
-def who_to_optimize() -> Run:
+async def who_to_optimize(tag=None) -> Run:
     graph_runs = get(Run, Graph)
     graph_stat = get_graph_stat()
     print(len(graph_stat))
@@ -191,13 +199,16 @@ def who_to_optimize() -> Run:
         exploration_term = C * math.sqrt(math.log(total_rons + 1) / (len(graph_rons[graph_id]) + 1))
         uct_scores[graph_id] = win_rate + exploration_term
 
-    best_graph_id = max(uct_scores, key=uct_scores.get)
-    runs_for_best_graph = graph_runs.get(best_graph_id, [])
+    best_graph = max(uct_scores, key=uct_scores.get)
+    runs_for_best_graph = graph_runs.get(best_graph, [])
     
     failed_runs = []
     for run in runs_for_best_graph:
         if not run.correct:
             failed_runs.append(run)
+    if not failed_runs:
+        await run_graph_42(best_graph, times=5, tag=tag)
+        return await who_to_optimize(tag=tag)
     def get_task_success_rate(run):
         stat = task_stat.get(run.task_id)
         if stat and stat[1] > 0:
@@ -206,23 +217,20 @@ def who_to_optimize() -> Run:
     return max(failed_runs, key=get_task_success_rate)
 
 def test_who_to_optize():
-    he = who_to_optimize()
+    he = asyncio.run(who_to_optimize())
     a = get_graph_from_a_folder("sampo/bflow", groph=True)
     asyncio.run(ron_(a, [he]))
 
-async def run_graph_42(times: int = 42, judgement='llm', tag='zerobench'):
-    # graph_folder = "/mnt/home/jkp/hack/tmp/MetaGPT/metagpt/ext/aflow/scripts/optimized/Zero/workflows/round_7"
-    graph_folder = "sample/basic"
-    graph = get_graph_from_a_folder(graph_folder)
+async def run_graph_42(graph: Graph, times: int = 42, tag=None):
     tasks = [await let_us_pick(graph=graph) for _ in range(times)]
-    results = await asyncio.gather(*[run_(graph, task, judgement=judgement) for graph, task in tasks])
+    results = await asyncio.gather(*[run_(graph, task) for graph, task in tasks])
     print(f"Completed {len(results)} tasks.")
 
-async def aflow(tag: str):
+async def aflow(tag=None):
     a = get_graph_from_a_folder('sampo/bflow', groph=True)
     for _ in range(10):
         result = [await run_(*await let_us_pick(tag=tag)) for _ in range(2)]
-        await ron_(a, [who_to_optimize()])
+        await ron_(a, [await who_to_optimize(tag=tag)])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
