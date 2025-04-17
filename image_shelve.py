@@ -138,7 +138,7 @@ def is_port_occupied(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
-def extract_image(x: str):
+async def extract_image(x: str):
     return [part for part in str_back(x) if isinstance(part, Image.Image)]
 
 

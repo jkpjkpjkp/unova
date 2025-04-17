@@ -192,9 +192,9 @@ def recover_image_from_a_parquet(filepath: str | list[str], tag: Optional[str] =
         images = [x['bytes'] for x in images] if isinstance(images, list) else [images['bytes']]
         images = img_go(images)
 
-if __name__ == "__main__":
-    recover_image_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet", tag='zerobench')
-    exit()
+# if __name__ == "__main__":
+#     recover_image_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet", tag='zerobench')
+#     exit()
 
 
 def test_get_graph_from_a_folder():
@@ -314,6 +314,8 @@ def get_strongest_graph():
                 Run.task_id,
                 func.avg(Run.correct).label("task_avg"),
             )
+            .join(Task, Run.task_id == Task.id)
+            .where(Task.tags.contains('zerobench'))
             .group_by(Run.graph_id, Run.task_id)
             .subquery("task_averages")
         )
@@ -331,7 +333,9 @@ def get_strongest_graph():
             .order_by(graph_avg_sq.c.overall_avg.desc())
         )
         
-        result = session.exec(stmt).first()
+        result = session.exec(stmt).all()
+        print(result)
+        exit()
         if result:
             strongest_graph, score = result
             print(f"Strongest graph found: ID={strongest_graph.id}, Score={score}")
@@ -344,7 +348,6 @@ def find_hardest_tasks(top_n: int = 10, tag=None):
         stmt = (
             select(Task, func.avg(Run.correct).label("avg_correctness"))
             .join(Run, Task.id == Run.task_id)
-            .where(Task.tags.contains(tag))
             .group_by(Task.id)
             .order_by(func.avg(Run.correct).asc()) # Ascending order for lowest correctness first
             .limit(top_n)
@@ -367,14 +370,16 @@ def test_find_hardest_tasks():
     assert len(ret) == 2
     assert isinstance(ret[0], Task)
 
-if __name__ == "__main__":
-    test_find_hardest_tasks()
 
 def all_tests():
     test_get_graph_from_a_folder()
     test_get_groph_from_a_folder()
-    test_read_tasks_from_a_parquet()
+    # test_read_tasks_from_a_parquet()
     test_get()
     test_count_rows()
     test_get_strongest_graph()
     test_find_hardest_tasks()
+
+
+if __name__ == "__main__":
+    all_tests()

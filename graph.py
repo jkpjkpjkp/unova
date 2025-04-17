@@ -158,6 +158,10 @@ async def run_(graph: Graph, task: Task):
             pass
     return go(Run(graph=graph, task=task, log=log_dict, correct=correct))
 
+if __name__ == "__main__":
+    asyncio.run(run_(get_graph_from_a_folder("sample/crop_seg"), Task(task="<image_x> What is the total number of pink rings forming the outer border of the heart shape?", answer="7")))
+    exit()
+
 def get_graph_stat(tag=None) -> dict[bytes, tuple[float, int]]:
     graph_stat = get(Run, Graph, Task, tag=tag)
     graphs = {graph:(
@@ -238,7 +242,7 @@ def test_who_to_optize():
     asyncio.run(ron_(a, [he]))
 
 async def run_graph_42(graph: Graph, times: int = 42, tag=None):
-    graph, tasks = await let_us_pick(graph=graph, num=times)
+    graph, tasks = await let_us_pick(graph=graph, num=times, tag=tag)
     results = await asyncio.gather(*[run_(graph, task) for task in tasks])
     print(f"Completed {len(results)} tasks.")
 
