@@ -255,6 +255,21 @@ def get(*args, tag=None, tag_exclude='no exclude'):
             return ret
         raise ValueError(f"Invalid number of arguments: {n}")
 
+def where(x, *args, tag=None, tag_exclude='no exclude'):
+    n = len(args)
+    assert n == 1
+    with Session(_engine) as session:
+        if tag:
+            aaa = session.exec(select(args[0]).where(~args[0].tags.contains('del')).where(~args[0].tags.contains(tag_exclude)).where(args[0].tags.contains(tag))).all()
+        else:
+            aaa = session.exec(select(args[0]).where(~args[0].tags.contains('del')).where(~args[0].tags.contains(tag_exclude))).all()
+        ret = []
+        for r in aaa:
+            if getattr(r, type(x).__name__.lower()) == x:
+                ret.append(r)
+        return ret
+
+
 def remove(x):
     with Session(_engine) as session:
         session.delete(x)
@@ -300,12 +315,38 @@ def find_the_strongest_graph():
             print(f"Strongest graph found: ID={strongest_graph.id}, Score={score}")
             return strongest_graph
         else:
-            print("No runs found to determine the strongest graph.")
-            return None
+            raise ValueError("No runs found to determine the strongest graph.")
+
+def find_hardest_tasks(top_n: int = 10, tag=None):
+    with Session(_engine) as session:
+        stmt = (
+            select(Task, func.avg(Run.correct).label("avg_correctness"))
+            .join(Run, Task.id == Run.task_id)
+            .where(Task.tags.contains(tag))
+            .group_by(Task.id)
+            .order_by(func.avg(Run.correct).asc()) # Ascending order for lowest correctness first
+            .limit(top_n)
+        )
+        results = session.exec(stmt).all()
+        if results:
+            print(f"Top {top_n} hardest tasks:")
+            for task, avg_correctness in results:
+                print(f"  Task ID: {task.id}, Avg Correctness: {avg_correctness:.4f}")
+            return [x[0] for x in results]
+        else:
+            print("No runs found to determine hardest tasks.")
+            return []
 
 def test_find_the_strongest_graph():
-    find_the_strongest_graph()
+    assert isinstance(find_the_strongest_graph(), Graph)
+def test_find_hardest_tasks():
+    ret = find_hardest_tasks(2)
+    assert isinstance(ret, list)
+    assert len(ret) == 2
+    assert isinstance(ret[0], Task)
 
+if __name__ == "__main__":
+    test_find_hardest_tasks()
 
 def all_tests():
     test_get_graph_from_a_folder()
@@ -314,3 +355,4 @@ def all_tests():
     test_get()
     test_count_rows()
     test_find_the_strongest_graph()
+    test_find_hardest_tasks()

@@ -217,8 +217,7 @@ async def who_to_optimize(tag=None) -> Run:
         if not run.correct:
             failed_runs.append(run)
     if not failed_runs:
-        await run_graph_42(best_graph, times=5, tag=tag)
-        return await who_to_optimize(tag=tag)
+        raise ValueError("No failed runs found")
     def get_task_success_rate(run):
         stat = task_stat.get(run.task_id)
         if stat and stat[1] > 0:
