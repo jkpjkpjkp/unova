@@ -12,9 +12,9 @@ import math
 from typing import Optional
 import argparse
 
-async def operator_custom(input, instruction=""):
+async def operator_custom(input, instruction="", model='gemini-2.0-flash'):
     prompt = instruction + input
-    response = await callopenai(prompt)
+    response = await callopenai(prompt, model=model)
     return response
 
 operators_dict = {
@@ -58,6 +58,14 @@ def get_graph_executable(graph_code: str, prompt_code: str):
     namespace['__name__'] = '__exec__'
     namespace['__package__'] = None
     
+    if graph_code.endswith('"""'):
+        pass
+    elif graph_code.endswith('""'):
+        graph_code += '"'
+    elif graph_code.endswith('"'):
+        graph_code += '""'
+    elif graph_code.endswith('"":'):
+        graph_code = graph_code[:-2] + '"""'
     try:
         exec(graph_code, namespace)
     except Exception:
@@ -116,9 +124,8 @@ async def run_(graph: Graph, task: Task):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
     try:
         output, localvar = await graph_executable(task.task)
-    except KeyError as e:
-        if 'LOCATE_PROMPT' in str(e):
-            remove(graph)
+    except:
+        print(f"Error running graph {graph.id} on task {task.id}")
         return None
     print(output)
     localvar['__OUTPUT__'] = output
@@ -153,14 +160,14 @@ def get_task_stat(tag=None) -> dict[bytes, tuple[int, int]]:
             tasks[task] = (sum(x.correct for x in task_stat[task]) + 1, len(task_stat[task]) + 2)
     return tasks
 
-async def let_us_pick(graph: Optional[Graph] = None, tag=None) -> Tuple[Graph, Task]:
+async def let_us_pick(graph: Optional[Graph] = None, num=1, tag=None) -> Tuple[Graph, Task]:
     if not graph:
         graphs = get_graph_stat()
         graph = random.choices(list(graphs.keys()), weights=[(x[0] / x[1]) ** 2 for x in graphs.values()])[0]
     
     tasks = get_task_stat(tag=tag)
-    task = random.choices(list(tasks.keys()), weights=[max(0, 3 - x[1])**2 + max(0, 0.3 - x[0]/x[1]) for x in tasks.values()])[0]
-    return graph, task
+    tasks = random.choices(list(tasks.keys()), weights=[max(0, 3 - x[1])**2 + max(0, 0.3 - x[0]/x[1]) for x in tasks.values()], k=num)
+    return graph, tasks
 
 
 def extract_xml(str) -> dict:
@@ -225,14 +232,16 @@ def test_who_to_optize():
     asyncio.run(ron_(a, [he]))
 
 async def run_graph_42(graph: Graph, times: int = 42, tag=None):
-    tasks = [await let_us_pick(graph=graph) for _ in range(times)]
-    results = await asyncio.gather(*[run_(graph, task) for graph, task in tasks])
+    graph, tasks = await let_us_pick(graph=graph, num=times)
+    results = await asyncio.gather(*[run_(graph, task) for task in tasks])
     print(f"Completed {len(results)} tasks.")
 
 async def aflow(tag=None):
     a = get_graph_from_a_folder('sampo/bflow', groph=True)
     for _ in range(10):
-        result = [await run_(*await let_us_pick(tag=tag)) for _ in range(2)]
+        graph, tasks = await let_us_pick(tag=tag, num=10)
+        tasks = [run_(graph, task) for task in tasks]
+        result = await asyncio.gather(*tasks)
         await ron_(a, [await who_to_optimize(tag=tag)])
 
 if __name__ == "__main__":

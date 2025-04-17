@@ -108,7 +108,7 @@ def is_port_occupied(port):
         return s.connect_ex(('localhost', port)) == 0
 
 
-async def callopenai(x: str, tools: list[Literal['crop']]=['crop']):
+async def callopenai(x: str, model='gemini-2.0-flash',tools: list[Literal['crop']]=[]):
     print(x)
     parts = re.split(ugly, x)
     image_set = []
@@ -194,7 +194,7 @@ async def callopenai(x: str, tools: list[Literal['crop']]=['crop']):
     }]
 
     response = openai.chat.completions.create(
-        model='dummy',
+        model=model,
         messages=messages,
         tools=tools,
         tool_choice="auto"
