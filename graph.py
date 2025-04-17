@@ -236,13 +236,18 @@ async def run_graph_42(graph: Graph, times: int = 42, tag=None):
     results = await asyncio.gather(*[run_(graph, task) for task in tasks])
     print(f"Completed {len(results)} tasks.")
 
+async def _aflow_iteration(groph, tag):
+    graph, tasks_to_run = await let_us_pick(tag=tag, num=10)
+    run_coroutines = [run_(graph, task) for task in tasks_to_run]
+    results = await asyncio.gather(*run_coroutines)
+    run_to_optimize = await who_to_optimize(tag=tag) 
+    await ron_(groph, [run_to_optimize])
+    return results
+
 async def aflow(tag=None):
     a = get_graph_from_a_folder('sampo/bflow', groph=True)
-    for _ in range(10):
-        graph, tasks = await let_us_pick(tag=tag, num=10)
-        tasks = [run_(graph, task) for task in tasks]
-        result = await asyncio.gather(*tasks)
-        await ron_(a, [await who_to_optimize(tag=tag)])
+    iteration_coroutines = [_aflow_iteration(a, tag) for _ in range(10)]
+    await asyncio.gather(*iteration_coroutines)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
