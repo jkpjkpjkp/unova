@@ -120,9 +120,6 @@ def test_ron_has_runid():
         print(ron.id)
         print(ron.runs)
 
-if __name__ == "__main__":
-    test_ron_has_runid()
-    exit()
 
 def DANGER_DANGER_DANGER_trim():  # everything with illegal foreign key (no related main key) is deleted
     with Session(_engine) as session:
@@ -232,13 +229,13 @@ def DANGER_DANGER_DANGER_test_add_tag_to_task():
             session.merge(task)
         session.commit()
 
-def get(*args, tag=None):
+def get(*args, tag=None, tag_exclude='no exclude'):
     n = len(args)
     with Session(_engine) as session:
         if tag:
-            aaa = session.exec(select(args[0]).where(args[0].tags.contains(tag))).all()
+            aaa = session.exec(select(args[0]).where(~args[0].tags.contains('del')).where(~args[0].tags.contains(tag_exclude)).where(args[0].tags.contains(tag))).all()
         else:
-            aaa = session.exec(select(args[0])).all()
+            aaa = session.exec(select(args[0]).where(~args[0].tags.contains('del')).where(~args[0].tags.contains(tag_exclude))).all()
         if n == 1:
             return aaa
         group1 = session.exec(select(args[1])).all()
@@ -272,12 +269,48 @@ def test_get():
 def test_count_rows():
     print(count_rows(Run))
 
+def find_the_strongest_graph():
+    with Session(_engine) as session:
+        task_avg_sq = (
+            select(
+                Run.graph_id,
+                Run.task_id,
+                func.avg(Run.correct).label("task_avg"),
+            )
+            .group_by(Run.graph_id, Run.task_id)
+            .subquery("task_averages")
+        )
+        graph_avg_sq = (
+            select(
+                task_avg_sq.c.graph_id,
+                func.avg(task_avg_sq.c.task_avg).label("overall_avg"),
+            )
+            .group_by(task_avg_sq.c.graph_id)
+            .subquery("graph_averages")
+        )
+        stmt = (
+            select(Graph, graph_avg_sq.c.overall_avg)
+            .join(graph_avg_sq, Graph.id == graph_avg_sq.c.graph_id)
+            .order_by(graph_avg_sq.c.overall_avg.desc())
+        )
+        
+        result = session.exec(stmt).first()
+        if result:
+            strongest_graph, score = result
+            print(f"Strongest graph found: ID={strongest_graph.id}, Score={score}")
+            return strongest_graph
+        else:
+            print("No runs found to determine the strongest graph.")
+            return None
+
+def test_find_the_strongest_graph():
+    find_the_strongest_graph()
+
+
 def all_tests():
     test_get_graph_from_a_folder()
     test_get_groph_from_a_folder()
     test_read_tasks_from_a_parquet()
     test_get()
     test_count_rows()
-
-if __name__ == "__main__":
-    read_tasks_from_a_parquet("/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet", tag='mmiq', tag_key='category', keys=('question_en', 'answer', 'image'))
+    test_find_the_strongest_graph()
