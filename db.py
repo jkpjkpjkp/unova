@@ -284,7 +284,7 @@ def test_get():
 def test_count_rows():
     print(count_rows(Run))
 
-def find_the_strongest_graph():
+def get_strongest_graph():
     with Session(_engine) as session:
         task_avg_sq = (
             select(
@@ -337,8 +337,8 @@ def find_hardest_tasks(top_n: int = 10, tag=None):
             print("No runs found to determine hardest tasks.")
             return []
 
-def test_find_the_strongest_graph():
-    assert isinstance(find_the_strongest_graph(), Graph)
+def test_get_strongest_graph():
+    assert isinstance(get_strongest_graph(), Graph)
 def test_find_hardest_tasks():
     ret = find_hardest_tasks(2)
     assert isinstance(ret, list)
@@ -354,5 +354,5 @@ def all_tests():
     test_read_tasks_from_a_parquet()
     test_get()
     test_count_rows()
-    test_find_the_strongest_graph()
+    test_get_strongest_graph()
     test_find_hardest_tasks()

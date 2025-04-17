@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai
 import os
-from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, remove, count_rows, find_the_strongest_graph
+from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, remove, count_rows, get_strongest_graph, get_strongest_graph
 from tqdm import tqdm
 import asyncio
 from typing import Tuple
@@ -194,30 +194,33 @@ async def ron_(groph: Groph, runs: list[Run], tag=None):
 
 
 async def who_to_optimize(tag=None) -> Run:
-    graph_runs = get(Run, Graph)
-    graph_stat = get_graph_stat()
-    print(len(graph_stat))
-    graph_rons = get(Ron, Graph)
+    # graph_runs = get(Run, Graph)
+    # graph_stat = get_graph_stat()
+    # print(len(graph_stat))
+    # graph_rons = get(Ron, Graph)
     task_stat = get_task_stat()
-    total_rons = count_rows(Ron)
-    uct_scores = {}
-    C = math.sqrt(2)
+    # total_rons = count_rows(Ron)
+    # uct_scores = {}
+    # C = math.sqrt(2)
 
-    for graph_id, stat in graph_stat.items():
-        num_correct, num_runs = stat
-        win_rate = num_correct / num_runs
-        exploration_term = C * math.sqrt(math.log(total_rons + 1) / (len(graph_rons[graph_id]) + 1))
-        uct_scores[graph_id] = win_rate + exploration_term
+    # for graph_id, stat in graph_stat.items():
+    #     num_correct, num_runs = stat
+    #     win_rate = num_correct / num_runs
+    #     exploration_term = C * math.sqrt(math.log(total_rons + 1) / (len(graph_rons[graph_id]) + 1))
+    #     uct_scores[graph_id] = win_rate + exploration_term
 
-    best_graph = max(uct_scores, key=uct_scores.get)
-    runs_for_best_graph = graph_runs.get(best_graph, [])
+    # best_graph = max(uct_scores, key=uct_scores.get)
+    best_graph = get_strongest_graph()
+    print(best_graph.id)
+    runs_for_best_graph = get(Run, Graph, tag=tag).get(best_graph, [])
     
     failed_runs = []
     for run in runs_for_best_graph:
         if not run.correct:
             failed_runs.append(run)
     if not failed_runs:
-        raise ValueError("No failed runs found")
+        print(f"No failed runs found in {len(runs_for_best_graph)} runs")
+        raise ValueError(f"No failed runs found in {len(runs_for_best_graph)} runs")
     def get_task_success_rate(run):
         stat = task_stat.get(run.task_id)
         if stat and stat[1] > 0:
