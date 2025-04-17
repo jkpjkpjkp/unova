@@ -3,7 +3,7 @@ import functools
 import sys
 from image_shelve import callopenai
 import os
-from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, remove, count_rows, get_strongest_graph, get_strongest_graph
+from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, remove, count_rows, get_strongest_graph, get_strongest_graph, where
 from tqdm import tqdm
 import asyncio
 from typing import Tuple
@@ -106,19 +106,26 @@ async def llm_judge(output, answer):
 
 async def judge(output, answer):
     try:
-        match = re.findall(r"{{(.*?)}}", output)
-        output = match.groups()[-1]
-        if re.sub(r'\s+', '', output) == re.sub(r'\s+', '', answer):
-            return True, {}
-        elif any(c.isdigit() for c in output):
-            response = await callopenai(f"is output and the answer the same? output: {output}, answer: {answer}. response in only 1 word, 'yes' (they are the same) or 'no'. ")
-            return response.strip().lower()[:3] == 'yes', {'short_judge_response': response}
+        matches = re.findall(r"{(.*?)}", output)
+        if matches:
+            extracted_output = matches[-1].strip()
+            if re.sub(r'\s+', '', extracted_output) == re.sub(r'\s+', '', answer):
+                return True, {}
+            elif any(c.isdigit() for c in extracted_output):
+                response = await callopenai(f"is output and the answer the same? output: {extracted_output}, answer: {answer}. response in only 1 word, 'yes' (they are the same) or 'no'. ")
+                return response.strip().lower()[:3] == 'yes', {'short_judge_response': response}
+            else:
+                return False, {}
         else:
-            return False, {}
+            print(f"No {{...}} found in output, falling back to LLM judge.")
+            return await llm_judge(output, answer)
+
     except Exception as e:
-        print(e)
+        print(f"Error during regex/simple judging: {e}")
         return await llm_judge(output, answer)
 
+def test_judge():
+    assert asyncio.run(judge(r"{1}", "1")) == (True, {})
 
 async def run_(graph: Graph, task: Task):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
@@ -194,39 +201,26 @@ async def ron_(groph: Groph, runs: list[Run], tag=None):
 
 
 async def who_to_optimize(tag=None) -> Run:
-    # graph_runs = get(Run, Graph)
-    # graph_stat = get_graph_stat()
-    # print(len(graph_stat))
-    # graph_rons = get(Ron, Graph)
-    task_stat = get_task_stat()
-    # total_rons = count_rows(Ron)
-    # uct_scores = {}
-    # C = math.sqrt(2)
-
-    # for graph_id, stat in graph_stat.items():
-    #     num_correct, num_runs = stat
-    #     win_rate = num_correct / num_runs
-    #     exploration_term = C * math.sqrt(math.log(total_rons + 1) / (len(graph_rons[graph_id]) + 1))
-    #     uct_scores[graph_id] = win_rate + exploration_term
-
-    # best_graph = max(uct_scores, key=uct_scores.get)
     best_graph = get_strongest_graph()
-    print(best_graph.id)
-    runs_for_best_graph = get(Run, Graph, tag=tag).get(best_graph, [])
+    task_stat = get_task_stat(tag=tag)
     
+    runs_for_best_graph = where(best_graph, Run, tag=tag)
+
     failed_runs = []
     for run in runs_for_best_graph:
         if not run.correct:
             failed_runs.append(run)
     if not failed_runs:
-        print(f"No failed runs found in {len(runs_for_best_graph)} runs")
+        print(f"No failed runs found for graph {best_graph.id} with tag '{tag}' among {len(runs_for_best_graph)} runs examined.")
         raise ValueError(f"No failed runs found in {len(runs_for_best_graph)} runs")
+    
     def get_task_success_rate(run):
         stat = task_stat.get(run.task_id)
         if stat and stat[1] > 0:
             return stat[0] / stat[1]
         return 0.0
-    return max(failed_runs, key=get_task_success_rate)
+    
+    return min(failed_runs, key=get_task_success_rate)
 
 def test_who_to_optize():
     he = asyncio.run(who_to_optimize())

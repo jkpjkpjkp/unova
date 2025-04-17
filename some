@@ -1,0 +1,11 @@
+SELECT * 
+FROM run
+JOIN graph
+ON run.graph_id = graph.id
+WHERE run.graph_id = (
+    SELECT graph_id
+    FROM run
+    GROUP BY graph_id
+    ORDER BY AVG(correct) DESC
+    LIMIT 3
+)

@@ -255,16 +255,24 @@ def get(*args, tag=None, tag_exclude='no exclude'):
             return ret
         raise ValueError(f"Invalid number of arguments: {n}")
 
+
+
+async def test_get(tag=None):
+    best_graph = get_strongest_graph()
+    task_stat = get_task_stat(tag=tag)
+    
+    print(get(Run, Graph, tag=tag)[best_graph])
+    runs_for_best_graph = get(Run, Graph, tag=tag)[best_graph]
+
 def where(x, *args, tag=None, tag_exclude='no exclude'):
+    print('HERE')
     n = len(args)
     assert n == 1
     with Session(_engine) as session:
-        if tag:
-            aaa = session.exec(select(args[0]).where(~args[0].tags.contains('del')).where(~args[0].tags.contains(tag_exclude)).where(args[0].tags.contains(tag))).all()
-        else:
-            aaa = session.exec(select(args[0]).where(~args[0].tags.contains('del')).where(~args[0].tags.contains(tag_exclude))).all()
+        aaa = session.exec(select(args[0])).all()
         ret = []
         for r in aaa:
+            print(getattr(r, type(x).__name__.lower()).id)
             if getattr(r, type(x).__name__.lower()) == x:
                 ret.append(r)
         return ret
