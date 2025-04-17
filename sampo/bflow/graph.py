@@ -35,7 +35,7 @@ class Graph:
         )
         prompt += self.prompt_custom['CUSTOM_USE']
         prompt += xml_hint(['graph', 'prompt'])
-        response = await self.custom(input=prompt)
+        response = await self.custom(input=prompt, model='gemini-2.5-pro-exp-03-25')
         data = xml_extract(response, ['graph', 'prompt'], {'graph': str, 'prompt': str})
         return Graph_(
             graph = data['graph'],

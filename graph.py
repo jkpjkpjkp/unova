@@ -17,9 +17,19 @@ async def operator_custom(input, instruction="", model='gemini-2.0-flash'):
     response = await callopenai(prompt, model=model)
     return response
 
+from image_shelve import extract_image as operator_extract_image
+from image_shelve import img_go as operator_img_to_url
+from image_shelve import sam2 as operator_sam2
+from image_shelve import depth_estimator as operator_depth_estimator
+
 operators_dict = {
     "Custom": operator_custom,
+    "ExtractImage": operator_extract_image,
+    "ImageToUrl": operator_img_to_url,
+    "SAM2": operator_sam2,
+    "Depth-Anything-V2": operator_depth_estimator,
 }
+
 
 
 def extract_local_variables(func):
@@ -131,9 +141,9 @@ async def run_(graph: Graph, task: Task):
     graph_executable = get_graph_executable(graph.graph, graph.prompt)
     try:
         output, localvar = await graph_executable(task.task)
-    except:
-        print(f"Error running graph {graph.id} on task {task.id}")
-        return None
+    except Exception as e:
+        print(f"Error running graph {graph.id} on task {task.id}: {e}")
+        raise
     print(output)
     localvar['__OUTPUT__'] = output
     correct, info = await judge(output, task.answer)

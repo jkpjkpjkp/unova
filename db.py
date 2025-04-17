@@ -182,6 +182,20 @@ def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = No
 
         go(Task(task=images + ' ' + row[keys[0]], answer=str(row[keys[1]]), tags=tags))
 
+def recover_image_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
+    import polars as pl
+    from tqdm import tqdm
+    from loguru import logger
+    df = pl.read_parquet(filepath)
+    for row in tqdm(df.iter_rows(named=True)):
+        images = row[keys[2]]
+        images = [x['bytes'] for x in images] if isinstance(images, list) else [images['bytes']]
+        images = img_go(images)
+
+if __name__ == "__main__":
+    recover_image_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet", tag='zerobench')
+    exit()
+
 
 def test_get_graph_from_a_folder():
     with Session(_engine) as session:

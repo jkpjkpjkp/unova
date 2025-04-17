@@ -26,5 +26,14 @@ async def ronron():
 async def fiveron():
     await asyncio.gather(*[ronron() for _ in range(5)])
 
+# if __name__ == "__main__":
+#     loop.run_until_complete(fiveron())
+
+async def run_graph_by_folder(folder: str):
+    graph = get_graph_from_a_folder(folder)
+    tasks = find_hardest_tasks(1, tag='zerobench')
+    await asyncio.gather(*[run_(graph, task) for task in tasks])
+
 if __name__ == "__main__":
-    loop.run_until_complete(fiveron())
+    loop.run_until_complete(run_graph_by_folder('sample/crop_seg'))
+

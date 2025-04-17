@@ -15,9 +15,17 @@ import json
 import fcntl
 from tqdm import tqdm
 import subprocess
+from gradio_client import Client, handle_file
+import numpy as np
+import tempfile
 
 _short_hash_to_image = shelve.open('image.shelve')
 long_hash_to_short_hash = shelve.open('long_to_short.shelve')
+migra_db = shelve.open('migra_db.shelve')
+
+def print_all_long_hash_to_short_hash():
+    for key, value in long_hash_to_short_hash.items():
+        print(f"{key}: {value}")
 
 
 def build_long_hash_from_short_hash():
@@ -26,10 +34,16 @@ def build_long_hash_from_short_hash():
         long_hash_to_short_hash[long_hash] = short_hash
 
 def get_image_by_short_hash(short_hash):
-    ret = _short_hash_to_image[short_hash]
-    if not hasattr(ret, 'filename'):
-        ret.filename = ""
-    return ret.convert('RGB')
+    try:
+        ret = _short_hash_to_image[short_hash]
+        if not hasattr(ret, 'filename'):
+            ret.filename = ""
+        return ret.convert('RGB')
+    except:
+        ret = migra_db[short_hash]
+        if not hasattr(ret, 'filename'):
+            ret.filename = ""
+        return ret.convert('RGB')
 
 def int_to_0aA(i):
     chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -45,16 +59,33 @@ def _img_go(image: Image.Image):
     image = image.convert('RGB')
     long_hash = hashlib.sha256(image.tobytes()).hexdigest()
     if long_hash in long_hash_to_short_hash and long_hash_to_short_hash[long_hash]:
-        return long_hash_to_short_hash[long_hash]
-    with fcntl.flock(fcntl.open('.image_count', fcntl.O_RDWR), fcntl.LOCK_EX):
-        with open('.image_count', 'r+') as f:
-            tot = int(f.read()) + 1
-            f.seek(0)
-            f.write(str(tot))
-    short_hash = int_to_0aA(tot)
-    long_hash_to_short_hash[long_hash] = short_hash
-    _short_hash_to_image[short_hash] = image
-    return short_hash
+        short_hash = long_hash_to_short_hash[long_hash]
+        try:
+            assert _short_hash_to_image[short_hash] == image
+        except:
+            migra_db[short_hash] = image
+            return short_hash
+        return short_hash
+    # with fcntl.flock(fcntl.open('.image_count', fcntl.O_RDWR), fcntl.LOCK_EX):
+    #     with open('.image_count', 'r+') as f:
+    #         tot = int(f.read()) + 1
+    #         f.seek(0)
+    #         f.write(str(tot))
+    # short_hash = int_to_0aA(tot)
+    # long_hash_to_short_hash[long_hash] = short_hash
+    # _short_hash_to_image[short_hash] = image
+    # return short_hash
+    print("No short hash found")
+
+def go_all(folder: str):
+    for file in os.listdir(folder):
+        if file.endswith('.png'):
+            image = Image.open(os.path.join(folder, file))
+            _img_go(image)
+
+if __name__ == "__main__":
+    go_all('/mnt/home/jkp/hack/diane/data/zerobench_images/zerobench')
+    exit()
 
 pretty = '<image_{short_hash}>'
 ugly = r'<image_([a-zA-Z0-9]{1,10}?)>'
@@ -107,6 +138,46 @@ def is_port_occupied(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
+def extract_image(x: str):
+    return [part for part in str_back(x) if isinstance(part, Image.Image)]
+
+
+def depth_estimator(image):
+    client = Client("http://localhost:7860/")
+    if not isinstance(image, Image.Image):
+        raise ValueError("image must be a PIL Image")
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        image.save(temp_file.name)
+        image_path = temp_file.name
+        try:
+            result_path = client.predict(
+                    image=handle_file(image_path),
+                    api_name="/predict"
+            )
+        finally:
+            os.remove(image_path)
+
+    depth_image = Image.open(result_path).convert('L')
+    depth_array = np.array(depth_image)
+
+    return depth_array
+
+def sam2(image):
+    client = Client("http://localhost:7861/")
+    if not isinstance(image, Image.Image):
+        raise ValueError("image must be a PIL Image")
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        image.save(temp_file.name)
+        image_path = temp_file.name
+    try:
+        result = client.predict(
+                input_image=handle_file(image_path),
+                api_name="/predict"
+        )
+    finally:
+        os.remove(image_path)
+    return np.array([np.array(Image.open(x['image'])) for x in result])
+
 
 async def callopenai(x: str, model='gemini-2.0-flash',tools: list[Literal['crop']]=[]):
     print(x)
@@ -142,7 +213,7 @@ async def callopenai(x: str, model='gemini-2.0-flash',tools: list[Literal['crop'
             content.append({"type": "text", "text": f"<image_{part}>"})
     
     def retrieve(image_id):
-        idc = re.match("image_(\d+)", image_id)
+        idc = re.match(r"image_(\d+)", image_id)
         if idc:
             image_id = int(idc.group(1)) - 1
             return get_image_by_short_hash(image_set[image_id])
@@ -259,7 +330,45 @@ def cli():
             print(f"Error: Short hash '{short_hash}' not found.")
         except Exception as e:
             print(f"Error: {e}")
+def check_and_repair_shelf():
+    corrupted_keys = []
+    print("Checking shelf for corrupted entries...")
+    for short_hash in list(_short_hash_to_image.keys()):
+        try:
+            # Attempt to load the image
+            image = _short_hash_to_image[short_hash]
+            # Verify it’s a valid PIL Image by accessing a property
+            image.tobytes()
+            # Update long_hash mapping
+            long_hash = hashlib.sha256(image.tobytes()).hexdigest()
+            long_hash_to_short_hash[long_hash] = short_hash
+        except Exception as e:
+            print(f"Corrupted key '{short_hash}': {e}")
+            corrupted_keys.append(short_hash)
+# import dbm
+# import pickle
+# import shelve
 
+# try:
+#     db = dbm.open('image.shelve', 'r')
+# except dbm.error as e:
+#     print(f"Error opening database: {e}")
+#     exit(1)
 
-if __name__ == "__main__":
-    cli()
+# new_shelf = shelve.open('recovered_data.db', 'c')
+
+# key = db.firstkey()
+# while key is not None:
+#     try:
+#         value = pickle.loads(db[key])
+#         new_shelf[key.decode()] = value
+#     except Exception as e:
+#         print(f"Error processing key {key}: {e}")
+#     key = db.nextkey(key)
+
+# new_shelf.close()
+# db.close()
+# # Run the repair
+# if __name__ == "__main__":
+#     # check_and_repair_shelf()
+#     cli()
