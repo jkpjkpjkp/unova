@@ -16,6 +16,7 @@ dependencies = [
     "pyarrow>=19.0.1",
     "pydantic>=2.11.3",
     "sqlmodel>=0.0.24",
+    "tenacity>=9.1.2",
 ]
 
 [dependency-groups]

@@ -330,45 +330,16 @@ def cli():
             print(f"Error: Short hash '{short_hash}' not found.")
         except Exception as e:
             print(f"Error: {e}")
+            
 def check_and_repair_shelf():
     corrupted_keys = []
     print("Checking shelf for corrupted entries...")
     for short_hash in list(_short_hash_to_image.keys()):
         try:
-            # Attempt to load the image
             image = _short_hash_to_image[short_hash]
-            # Verify it’s a valid PIL Image by accessing a property
             image.tobytes()
-            # Update long_hash mapping
             long_hash = hashlib.sha256(image.tobytes()).hexdigest()
             long_hash_to_short_hash[long_hash] = short_hash
         except Exception as e:
             print(f"Corrupted key '{short_hash}': {e}")
             corrupted_keys.append(short_hash)
-# import dbm
-# import pickle
-# import shelve
-
-# try:
-#     db = dbm.open('image.shelve', 'r')
-# except dbm.error as e:
-#     print(f"Error opening database: {e}")
-#     exit(1)
-
-# new_shelf = shelve.open('recovered_data.db', 'c')
-
-# key = db.firstkey()
-# while key is not None:
-#     try:
-#         value = pickle.loads(db[key])
-#         new_shelf[key.decode()] = value
-#     except Exception as e:
-#         print(f"Error processing key {key}: {e}")
-#     key = db.nextkey(key)
-
-# new_shelf.close()
-# db.close()
-# # Run the repair
-# if __name__ == "__main__":
-#     # check_and_repair_shelf()
-#     cli()
