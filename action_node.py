@@ -518,22 +518,6 @@ class ActionNode:
             self.instruct_content = cls(**tmp)
             return self
 
-    def _makeup_nodes_output_with_req(self) -> dict[str, str]:
-        instruct_content_dict = self.instruct_content.model_dump()
-        nodes_output = {}
-        for key, value in instruct_content_dict.items():
-            child = self.get_child(key)
-            nodes_output[key] = {"value": value, "requirement": child.instruction if child else self.instruction}
-        return nodes_output
-
-    def _makeup_nodes_output_with_comment(self, review_comments: dict[str, str]) -> dict[str, str]:
-        instruct_content_dict = self.instruct_content.model_dump()
-        nodes_output = {}
-        for key, value in instruct_content_dict.items():
-            if key in review_comments:
-                nodes_output[key] = {"value": value, "comment": review_comments[key]}
-        return nodes_output
-
     @classmethod
     def from_pydantic(cls, model: Type[BaseModel], key: str = None):
         """
