@@ -1,45 +1,23 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
-@Time    : 2023/12/11 18:45
-@Author  : alexanderwu
-@File    : action_node.py
-
-NOTE: You should use typing.List instead of list to do type annotation. Because in the markdown extraction process,
-  we can use typing to extract the type of the node, but we cannot use built-in list to extract.
-"""
 import json
 import re
 import typing
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
-
 from pydantic import BaseModel, Field, create_model, model_validator
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import openai
-
-class ReviewMode(Enum):
-    HUMAN = "human"
-    AUTO = "auto"
-
-
-class ReviseMode(Enum):
-    HUMAN = "human"  # human revise
-    HUMAN_REVIEW = "human_review"  # human-review and auto-revise
-    AUTO = "auto"  # auto-review and auto-revise
-
+from loguru import logger
+import functools
+from llmpostprocess import llm_output_postprocess
 
 TAG = "CONTENT"
-
 
 class FillMode(Enum):
     CODE_FILL = "code_fill"
     XML_FILL = "xml_fill"
     SINGLE_FILL = "single_fill"
 
-
 FORMAT_CONSTRAINT = f"Format: output wrapped inside [{TAG}][/{TAG}] like format example, nothing else."
-
 
 SIMPLE_TEMPLATE = """
 ## context
@@ -59,6 +37,7 @@ SIMPLE_TEMPLATE = """
 ## action
 Follow instructions of nodes, generate output and make sure it follows the format example.
 """
+
 def dict_to_markdown(d, prefix="## ", kv_sep="\n", postfix="\n"):
     markdown_str = ""
     for key, value in d.items():
@@ -76,11 +55,46 @@ class LLM:
                 {"role": "system", "content": system_msgs or "You are a helpful assistant."},
                 {"role": "user", "content": [
                     {"type": "text", "text": prompt},
-                    *({"type": "image_url", "image_url": { "url": image.present()}}
-                        for image in images)
+                    *list.concat(image.present() for image in images)
                 ]}
             ),
         ).choices[0].message.content
+
+action_outcls_registry = dict()
+
+def register_action_outcls(func):
+    """
+    Due to `create_model` return different Class even they have same class name and mapping.
+    In order to do a comparison, use outcls_id to identify same Class with same class name and field definition
+    """
+
+    @functools.wraps(func)
+    def decorater(*args, **kwargs):
+        """
+        arr example
+            [<class 'metagpt.actions.action_node.ActionNode'>, 'test', {'field': (str, Ellipsis)}]
+        """
+        arr = list(args) + list(kwargs.values())
+        """
+        outcls_id example
+            "<class 'metagpt.actions.action_node.ActionNode'>_test_{'field': (str, Ellipsis)}"
+        """
+        for idx, item in enumerate(arr):
+            if isinstance(item, dict):
+                arr[idx] = dict(sorted(item.items()))
+        outcls_id = "_".join([str(i) for i in arr])
+        # eliminate typing influence
+        outcls_id = outcls_id.replace("typing.List", "list").replace("typing.Dict", "dict")
+
+        if outcls_id in action_outcls_registry:
+            return action_outcls_registry[outcls_id]
+
+        out_cls = func(*args, **kwargs)
+        action_outcls_registry[outcls_id] = out_cls
+        return out_cls
+
+    return decorater
+
 
 class ActionNode:
     """ActionNode is a tree of nodes."""
@@ -341,7 +355,7 @@ class ActionNode:
             schema="markdown": 编译context, example(markdown), instruction(markdown), constraint, action
         """
         if schema == "raw":
-            return f"{context}\n\n## Actions\n{LANGUAGE_CONSTRAINT}\n{self.instruction}"
+            return f"{context}\n\n## Actions\n{self.instruction}"
 
         ### 直接使用 pydantic BaseModel 生成 instruction 与 example，仅限 JSON
         # child_class = self._create_children_class()
@@ -359,8 +373,7 @@ class ActionNode:
         instruction = self.compile_instruction(schema="markdown", mode=mode, exclude=exclude)
         example = self.compile_example(schema=schema, tag=TAG, mode=mode, exclude=exclude)
         # nodes = ", ".join(self.to_dict(mode=mode).keys())
-        constraints = [LANGUAGE_CONSTRAINT, FORMAT_CONSTRAINT]
-        constraint = "\n".join(constraints)
+        constraint = FORMAT_CONSTRAINT
 
         prompt = template.format(
             context=context,
@@ -373,7 +386,6 @@ class ActionNode:
     @retry(
         wait=wait_random_exponential(min=1, max=20),
         stop=stop_after_attempt(6),
-        after=general_after_log(logger),
     )
     async def _aask_v1(
         self,
@@ -383,7 +395,7 @@ class ActionNode:
         images: Optional[Union[str, list[str]]] = None,
         system_msgs: Optional[list[str]] = None,
         schema="markdown",  # compatible to original format
-        timeout=USE_CONFIG_TIMEOUT,
+        timeout=10,
     ) -> (str, BaseModel):
         """Use ActionOutput to wrap the output of aask"""
         if images and len(images) > 10:
@@ -395,12 +407,10 @@ class ActionNode:
         logger.debug(f"llm raw output:\n{content}")
         output_class = self.create_model_class(output_class_name, output_data_mapping)
 
-        if schema == "json":
-            parsed_data = llm_output_postprocess(
-                output=content, schema=output_class.model_json_schema(), req_key=f"[/{TAG}]"
-            )
-        else:  # using markdown parser
-            parsed_data = OutputParser.parse_data_with_mapping(content, output_data_mapping)
+        assert schema == "json"
+        parsed_data = llm_output_postprocess(
+            output=content, schema=output_class.model_json_schema(), req_key=f"[/{TAG}]"
+        )
 
         logger.debug(f"parsed_data:\n{parsed_data}")
         instruct_content = output_class(**parsed_data)
@@ -421,7 +431,7 @@ class ActionNode:
         self.set_recursive("context", context)
 
     async def simple_fill(
-        self, schema, mode, images: Optional[Union[str, list[str]]] = None, timeout=USE_CONFIG_TIMEOUT, exclude=None
+        self, schema, mode, images: Optional[Union[str, list[str]]] = None, timeout=10, exclude=None
     ):
         prompt = self.compile(context=self.context, schema=schema, mode=mode, exclude=exclude)
         if schema != "raw":
@@ -485,19 +495,6 @@ class ActionNode:
 """
         return context
 
-    async def code_fill(
-        self, context: str, function_name: Optional[str] = None, timeout: int = USE_CONFIG_TIMEOUT
-    ) -> Dict[str, str]:
-        """
-        Fill CodeBlock Using ``` ```
-        """
-        field_name = self.get_field_name()
-        prompt = context
-        content = await self.llm.aask(prompt, timeout=timeout)
-        extracted_code = sanitize(code=content, entrypoint=function_name)
-        result = {field_name: extracted_code}
-        return result
-
     async def single_fill(self, context: str, images: Optional[Union[str, list[str]]] = None) -> Dict[str, str]:
         field_name = self.get_field_name()
         prompt = context
@@ -548,7 +545,6 @@ class ActionNode:
 
         return extracted_data
 
-    @exp_cache(serializer=ActionNodeSerializer())
     async def fill(
         self,
         *,
@@ -558,7 +554,7 @@ class ActionNode:
         mode="auto",
         strgy="simple",
         images: Optional[Union[str, list[str]]] = None,
-        timeout=USE_CONFIG_TIMEOUT,
+        timeout=10,
         exclude=[],
         function_name: str = None,
     ):
@@ -582,10 +578,6 @@ class ActionNode:
         :param exclude: The keys of ActionNode to exclude.
         :return: self
         """
-        
-        from metagpt.ext.aflow.scripts.message import MultimodalMessage as MM
-        if isinstance(req, MM):
-            return await self.fill(req=str(req), llm=llm, schema=schema, mode=mode, strgy=strgy, images=req.images, timeout=timeout, exclude=exclude, function_name=function_name)
         self.set_llm(llm)
         self.set_context(req)
         if self.schema:
@@ -620,13 +612,6 @@ class ActionNode:
             cls = self._create_children_class()
             self.instruct_content = cls(**tmp)
             return self
-        
-    async def human_review(self) -> dict[str, str]:
-        review_comments = HumanInteraction().interact_with_instruct_content(
-            instruct_content=self.instruct_content, interact_type="review"
-        )
-
-        return review_comments
 
     def _makeup_nodes_output_with_req(self) -> dict[str, str]:
         instruct_content_dict = self.instruct_content.model_dump()
@@ -636,86 +621,6 @@ class ActionNode:
             nodes_output[key] = {"value": value, "requirement": child.instruction if child else self.instruction}
         return nodes_output
 
-    async def auto_review(self, template: str = REVIEW_TEMPLATE) -> dict[str, str]:
-        """use key's output value and its instruction to review the modification comment"""
-        nodes_output = self._makeup_nodes_output_with_req()
-        """nodes_output format:
-        {
-            "key": {"value": "output value", "requirement": "key instruction"}
-        }
-        """
-        if not nodes_output:
-            return dict()
-
-        prompt = template.format(
-            nodes_output=json.dumps(nodes_output, ensure_ascii=False),
-            tag=TAG,
-            constraint=FORMAT_CONSTRAINT,
-            prompt_schema="json",
-        )
-
-        content = await self.llm.aask(prompt)
-        # Extract the dict of mismatch key and its comment. Due to the mismatch keys are unknown, here use the keys
-        # of ActionNode to judge if exist in `content` and then follow the `data_mapping` method to create model class.
-        keys = self.keys()
-        include_keys = []
-        for key in keys:
-            if f'"{key}":' in content:
-                include_keys.append(key)
-        if not include_keys:
-            return dict()
-
-        exclude_keys = list(set(keys).difference(include_keys))
-        output_class_name = f"{self.key}_AN_REVIEW"
-        output_class = self.create_class(class_name=output_class_name, exclude=exclude_keys)
-        parsed_data = llm_output_postprocess(
-            output=content, schema=output_class.model_json_schema(), req_key=f"[/{TAG}]"
-        )
-        instruct_content = output_class(**parsed_data)
-        return instruct_content.model_dump()
-
-    async def simple_review(self, review_mode: ReviewMode = ReviewMode.AUTO):
-        # generate review comments
-        if review_mode == ReviewMode.HUMAN:
-            review_comments = await self.human_review()
-        else:
-            review_comments = await self.auto_review()
-
-        if not review_comments:
-            logger.warning("There are no review comments")
-        return review_comments
-
-    async def review(self, strgy: str = "simple", review_mode: ReviewMode = ReviewMode.AUTO):
-        """only give the review comment of each exist and mismatch key
-
-        :param strgy: simple/complex
-         - simple: run only once
-         - complex: run each node
-        """
-        if not hasattr(self, "llm"):
-            raise RuntimeError("use `review` after `fill`")
-        assert review_mode in ReviewMode
-        assert self.instruct_content, 'review only support with `schema != "raw"`'
-
-        if strgy == "simple":
-            review_comments = await self.simple_review(review_mode)
-        elif strgy == "complex":
-            # review each child node one-by-one
-            review_comments = {}
-            for _, child in self.children.items():
-                child_review_comment = await child.simple_review(review_mode)
-                review_comments.update(child_review_comment)
-
-        return review_comments
-
-    async def human_revise(self) -> dict[str, str]:
-        review_contents = HumanInteraction().interact_with_instruct_content(
-            instruct_content=self.instruct_content, mapping=self.get_mapping(mode="auto"), interact_type="revise"
-        )
-        # re-fill the ActionNode
-        self.update_instruct_content(review_contents)
-        return review_contents
-
     def _makeup_nodes_output_with_comment(self, review_comments: dict[str, str]) -> dict[str, str]:
         instruct_content_dict = self.instruct_content.model_dump()
         nodes_output = {}
@@ -723,46 +628,6 @@ class ActionNode:
             if key in review_comments:
                 nodes_output[key] = {"value": value, "comment": review_comments[key]}
         return nodes_output
-
-    async def auto_revise(
-        self, revise_mode: ReviseMode = ReviseMode.AUTO, template: str = REVISE_TEMPLATE
-    ) -> dict[str, str]:
-        """revise the value of incorrect keys"""
-        # generate review comments
-        if revise_mode == ReviseMode.AUTO:
-            review_comments: dict = await self.auto_review()
-        elif revise_mode == ReviseMode.HUMAN_REVIEW:
-            review_comments: dict = await self.human_review()
-
-        include_keys = list(review_comments.keys())
-
-        # generate revise content, two-steps
-        # step1, find the needed revise keys from review comments to makeup prompt template
-        nodes_output = self._makeup_nodes_output_with_comment(review_comments)
-        keys = self.keys()
-        exclude_keys = list(set(keys).difference(include_keys))
-        example = self.compile_example(schema="json", mode="auto", tag=TAG, exclude=exclude_keys)
-        instruction = self.compile_instruction(schema="markdown", mode="auto", exclude=exclude_keys)
-
-        prompt = template.format(
-            nodes_output=json.dumps(nodes_output, ensure_ascii=False),
-            example=example,
-            instruction=instruction,
-            constraint=FORMAT_CONSTRAINT,
-            prompt_schema="json",
-        )
-
-        # step2, use `_aask_v1` to get revise structure result
-        output_mapping = self.get_mapping(mode="auto", exclude=exclude_keys)
-        output_class_name = f"{self.key}_AN_REVISE"
-        content, scontent = await self._aask_v1(
-            prompt=prompt, output_class_name=output_class_name, output_data_mapping=output_mapping, schema="json"
-        )
-
-        # re-fill the ActionNode
-        sc_dict = scontent.model_dump()
-        self.update_instruct_content(sc_dict)
-        return sc_dict
 
     async def simple_revise(self, revise_mode: ReviseMode = ReviseMode.AUTO) -> dict[str, str]:
         if revise_mode == ReviseMode.HUMAN:

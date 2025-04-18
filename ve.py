@@ -53,6 +53,6 @@ class VisualEntity:
             center = tuple(int, int)(self.center())
             x, y = self.bbox // 2
             for _ in range(3):
-
+                
 
 VE = VisualEntity
