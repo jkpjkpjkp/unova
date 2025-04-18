@@ -2,7 +2,7 @@ import json
 import re
 import typing
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, Literal
 from pydantic import BaseModel, Field, create_model, model_validator
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import openai
@@ -62,66 +62,23 @@ class LLM:
 
 action_outcls_registry = dict()
 
-def register_action_outcls(func):
-    """
-    Due to `create_model` return different Class even they have same class name and mapping.
-    In order to do a comparison, use outcls_id to identify same Class with same class name and field definition
-    """
-
-    @functools.wraps(func)
-    def decorater(*args, **kwargs):
-        """
-        arr example
-            [<class 'metagpt.actions.action_node.ActionNode'>, 'test', {'field': (str, Ellipsis)}]
-        """
-        arr = list(args) + list(kwargs.values())
-        """
-        outcls_id example
-            "<class 'metagpt.actions.action_node.ActionNode'>_test_{'field': (str, Ellipsis)}"
-        """
-        for idx, item in enumerate(arr):
-            if isinstance(item, dict):
-                arr[idx] = dict(sorted(item.items()))
-        outcls_id = "_".join([str(i) for i in arr])
-        # eliminate typing influence
-        outcls_id = outcls_id.replace("typing.List", "list").replace("typing.Dict", "dict")
-
-        if outcls_id in action_outcls_registry:
-            return action_outcls_registry[outcls_id]
-
-        out_cls = func(*args, **kwargs)
-        action_outcls_registry[outcls_id] = out_cls
-        return out_cls
-
-    return decorater
-
 
 class ActionNode:
-    """ActionNode is a tree of nodes."""
 
-    schema: str  # raw/json/markdown, default: ""
-
-    # Action Context
+    schema: Literal['raw', 'json', 'markdown'] #  default: ""
     context: str  # all the context, including all necessary info
     llm: LLM  # LLM with aask interface
     children: dict[str, "ActionNode"]
 
     # Action Input
-    key: str  # Product Requirement / File list / Code
-    func: typing.Callable  # 与节点相关联的函数或LLM调用
-    params: Dict[str, Type]  # 输入参数的字典，键为参数名，值为参数类型
-    expected_type: Type  # such as str / int / float etc.
-    # context: str  # everything in the history.
-    instruction: str  # the instructions should be followed.
+    key: str
+    expected_type: Type  # pydantic type
+    instruction: str  # pydantic description
     example: Any  # example for In Context-Learning.
 
     # Action Output
     content: str
     instruct_content: BaseModel
-
-    # For ActionGraph
-    prevs: List["ActionNode"]  # previous nodes
-    nexts: List["ActionNode"]  # next nodes
 
     def __init__(
         self,
@@ -140,8 +97,6 @@ class ActionNode:
         self.content = content
         self.children = children if children is not None else {}
         self.schema = schema
-        self.prevs = []
-        self.nexts = []
 
     def __str__(self):
         return (
@@ -152,32 +107,12 @@ class ActionNode:
     def __repr__(self):
         return self.__str__()
 
-    def add_prev(self, node: "ActionNode"):
-        """增加前置ActionNode"""
-        self.prevs.append(node)
-
-    def add_next(self, node: "ActionNode"):
-        """增加后置ActionNode"""
-        self.nexts.append(node)
-
     def add_child(self, node: "ActionNode"):
         """增加子ActionNode"""
         self.children[node.key] = node
 
     def get_child(self, key: str) -> Union["ActionNode", None]:
         return self.children.get(key, None)
-
-    def add_children(self, nodes: List["ActionNode"]):
-        """批量增加子ActionNode"""
-        for node in nodes:
-            self.add_child(node)
-
-    @classmethod
-    def from_children(cls, key, nodes: List["ActionNode"]):
-        """直接从一系列的子nodes初始化"""
-        obj = cls(key, str, "", "")
-        obj.add_children(nodes)
-        return obj
 
     def _get_children_mapping(self, exclude=None) -> Dict[str, Any]:
         """获得子ActionNode的字典，以key索引，支持多级结构。"""
@@ -208,7 +143,6 @@ class ActionNode:
         return {} if exclude and self.key in exclude else self._get_self_mapping()
 
     @classmethod
-    @register_action_outcls
     def create_model_class(cls, class_name: str, mapping: Dict[str, Tuple[Type, Any]]):
         """基于pydantic v2的模型动态生成，用来检验结果类型正确性"""
 
@@ -356,17 +290,6 @@ class ActionNode:
         """
         if schema == "raw":
             return f"{context}\n\n## Actions\n{self.instruction}"
-
-        ### 直接使用 pydantic BaseModel 生成 instruction 与 example，仅限 JSON
-        # child_class = self._create_children_class()
-        # node_schema = child_class.model_json_schema()
-        # defaults = {
-        #     k: str(v)
-        #     for k, v in child_class.model_fields.items()
-        #     if k not in exclude
-        # }
-        # instruction = node_schema
-        # example = json.dumps(defaults, indent=4)
 
         # FIXME: json instruction会带来格式问题，如："Project name": "web_2048  # 项目名称使用下划线",
         # compile example暂时不支持markdown
