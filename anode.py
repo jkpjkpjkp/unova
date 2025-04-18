@@ -1,4 +1,42 @@
 import re
+from PIL import Image
+from typing import Literal, Self, Iterator
+import functools
+
+def crop(img: Image.Image, xyxy: tuple[int, int, int, int] | None = None) -> Image.Image:
+    return img.crop(xyxy or img.getbbox())
+def area(img: Image.Image) -> int:
+    R,G,B,A = tuple(range(4))
+    return sum(img.getdata(band=A) / 255)
+
+class VisualEntity:
+    image: Image.Image | list['VisualEntity']
+
+    def __iter__(self) -> Iterator[Self]:
+        if isinstance(self.image, Image.Image):
+            yield self
+        else:
+            return iter(self.image)
+    def __len__(self):
+        return len(self.image) if isinstance(self.image, list) else 1
+    def __getitem__(self, item) -> Self:
+        if isinstance(self.image, Image.Image):
+            assert item == 0
+            return self
+        else:
+            return self.image[item]
+    def __add__(self, other: Self) -> Self:
+        l = self.image if isinstance(self.image, list) else [self]
+        r = other.image if isinstance(other.image, list) else [other]
+        return VisualEntity(l + r)
+    def aggregate(self):
+        return functools.reduce(lambda a, b: a.alpha_composite(b), self.image, initial=Image.new('RGBA', self.image[0].size, (0, 0, 0, 0)))
+    def render(self):
+        return crop(self.aggregate())
+    
+    def __init__(self, img: Image.Image | list[Self]):
+        self.image = img
+VE = VisualEntity
 
 def xml_hint(field_names: list[str]):
     examples = []
