@@ -103,34 +103,25 @@ class ActionNode:
             f"{self.key}, {repr(self.expected_type)}, {self.instruction}, {self.example}"
             f", {self.content}, {self.children}"
         )
-
     def __repr__(self):
         return self.__str__()
 
     def add_child(self, node: "ActionNode"):
-        """增加子ActionNode"""
         self.children[node.key] = node
 
     def get_child(self, key: str) -> Union["ActionNode", None]:
         return self.children.get(key, None)
 
     def _get_children_mapping(self, exclude=None) -> Dict[str, Any]:
-        """获得子ActionNode的字典，以key索引，支持多级结构。"""
+        """获得子ActionNode的字典，以key索引。"""
         exclude = exclude or []
 
-        def _get_mapping(node: "ActionNode") -> Dict[str, Any]:
-            mapping = {}
-            for key, child in node.children.items():
-                if key in exclude:
-                    continue
-                # 对于嵌套的子节点，递归调用 _get_mapping
-                if child.children:
-                    mapping[key] = _get_mapping(child)
-                else:
-                    mapping[key] = (child.expected_type, Field(default=child.example, description=child.instruction))
-            return mapping
-
-        return _get_mapping(self)
+        mapping = {}
+        for key, child in self.children.items():
+            if key in exclude:
+                continue
+            mapping[key] = (child.expected_type, Field(default=child.example, description=child.instruction))
+        return mapping
 
     def _get_self_mapping(self) -> Dict[str, Tuple[Type, Any]]:
         """get self key: type mapping"""
@@ -201,8 +192,7 @@ class ActionNode:
         """将当前节点与子节点都按照node: format的格式组织成字典"""
 
         # 如果没有提供格式化函数，则使用默认的格式化函数
-        if format_func is None:
-            format_func = lambda node: node.instruction
+        format_func = format_func or (lambda node: node.instruction)
 
         # 使用提供的格式化函数来格式化当前节点的值
         formatted_value = format_func(self)
@@ -224,15 +214,7 @@ class ActionNode:
             # 递归调用 to_dict 方法并更新节点字典
             child_dict = child_node._to_dict(format_func, mode, exclude)
             node_value[child_key] = child_dict
-
         return node_value
-
-    def update_instruct_content(self, incre_data: dict[str, Any]):
-        assert self.instruct_content
-        origin_sc_dict = self.instruct_content.model_dump()
-        origin_sc_dict.update(incre_data)
-        output_class = self.create_class()
-        self.instruct_content = output_class(**origin_sc_dict)
 
     def keys(self, mode: str = "auto") -> list:
         if mode == "children" or (mode == "auto" and self.children):
@@ -551,38 +533,6 @@ class ActionNode:
             if key in review_comments:
                 nodes_output[key] = {"value": value, "comment": review_comments[key]}
         return nodes_output
-
-    async def simple_revise(self, revise_mode: ReviseMode = ReviseMode.AUTO) -> dict[str, str]:
-        if revise_mode == ReviseMode.HUMAN:
-            revise_contents = await self.human_revise()
-        else:
-            revise_contents = await self.auto_revise(revise_mode)
-
-        return revise_contents
-
-    async def revise(self, strgy: str = "simple", revise_mode: ReviseMode = ReviseMode.AUTO) -> dict[str, str]:
-        """revise the content of ActionNode and update the instruct_content
-
-        :param strgy: simple/complex
-         - simple: run only once
-         - complex: run each node
-        """
-        if not hasattr(self, "llm"):
-            raise RuntimeError("use `revise` after `fill`")
-        assert revise_mode in ReviseMode
-        assert self.instruct_content, 'revise only support with `schema != "raw"`'
-
-        if strgy == "simple":
-            revise_contents = await self.simple_revise(revise_mode)
-        elif strgy == "complex":
-            # revise each child node one-by-one
-            revise_contents = {}
-            for _, child in self.children.items():
-                child_revise_content = await child.simple_revise(revise_mode)
-                revise_contents.update(child_revise_content)
-            self.update_instruct_content(revise_contents)
-
-        return revise_contents
 
     @classmethod
     def from_pydantic(cls, model: Type[BaseModel], key: str = None):
