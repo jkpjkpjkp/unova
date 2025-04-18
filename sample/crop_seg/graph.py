@@ -2,13 +2,10 @@ from ve import VE
 from pydantic import BaseModel
 
 class Graph:
-    def __init__(self, operators: dict, prompt_custom: dict):
+    def __init__(self, operators: dict):
         self.custom = operators['Custom']
-        self.extract_image = operators['ExtractImage']
-        self.image_to_url = operators['ImageToUrl']
+        self.crop = operators['Crop']
         self.sam = operators['SAM2']
-        self.depth = operators['Depth-Anything-V2']
-        self.prompt_custom = prompt_custom
     
     def subproblem_generation(self, question) -> str:
         class splitaggregate(BaseModel):

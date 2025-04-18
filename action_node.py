@@ -25,7 +25,7 @@ class LLM:
             api_key='sk-local',
             base_url='http://localhost:7912'
         )
-    async def aask(self, prompt, system_msgs, images=[], timeout=10):
+    async def aask(self, prompt, system_msgs='', images=[], timeout=10):
         messages = [
             {"role": "system", "content": system_msgs or "You are a helpful assistant."},
             {"role": "user", "content": [{"type": "text", "text": prompt}]}
@@ -1364,5 +1364,34 @@ def test_custom():
     print(custom('hi! '))
 
 
+
+class Operator:
+    def __init__(self, llm: LLM, name: str):
+        self.name = name
+        self.llm = llm
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError
+
+    async def _fill_node(self, op_class, prompt, mode=None, **extra_kwargs):
+        fill_kwargs = {"context": prompt, "llm": self.llm}
+        if mode:
+            fill_kwargs["mode"] = mode
+        fill_kwargs.update(extra_kwargs)
+
+        node = await ActionNode.from_pydantic(op_class).fill(**fill_kwargs)
+        return node.instruct_content.model_dump()
+
+class Custom(Operator):
+    def __init__(self, llm: LLM, name: str = "Custom"):
+        super().__init__(llm, name)
+
+    async def __call__(self, input, pydantic_model=GenerateOp, mode: Literal["single_fill", "xml_fill", "code_fill"] = "single_fill"):
+        prompt = input
+        response = await self._fill_node(pydantic_model, prompt, mode=mode)
+        return response
+
+
 if __name__ == '__main__':
-    test_custom()
+    
+    print(asyncio.run(Custom(LLM())('hi! ')))
