@@ -1,20 +1,15 @@
 import shelve
 from PIL import Image
 import hashlib
-from multiprocessing import Lock
-from typing import Any, Iterable, Optional, Union, List, Literal
+from typing import Any, Iterable, Optional, Union, Literal
 import base64
 import binascii
 import io
 import re
 import openai
 import os
-import argparse
-import asyncio
 import json
-import fcntl
 from tqdm import tqdm
-import subprocess
 from gradio_client import Client, handle_file
 import numpy as np
 import tempfile

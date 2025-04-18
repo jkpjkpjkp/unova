@@ -1,6 +1,5 @@
 
 
-import asyncio
 
 class Graph:
     def __init__(self, operators: dict, prompt_custom: object):

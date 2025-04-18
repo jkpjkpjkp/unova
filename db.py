@@ -1,11 +1,10 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 from sqlalchemy import Column, func
 from sqlalchemy.types import JSON
-from typing import List, Optional, Tuple, Type, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any
 import hashlib
 import os
 from image_shelve import go as img_go
-import json
 
 db_name = "main.db"
 tag='zerobench'
@@ -166,7 +165,6 @@ def get_by_id(ret_type, id: bytes):
 def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
     import polars as pl
     from tqdm import tqdm
-    from loguru import logger
     df = pl.read_parquet(filepath)
     for row in tqdm(df.iter_rows(named=True)):
         images = row[keys[2]]
@@ -185,7 +183,6 @@ def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = No
 def recover_image_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
     import polars as pl
     from tqdm import tqdm
-    from loguru import logger
     df = pl.read_parquet(filepath)
     for row in tqdm(df.iter_rows(named=True)):
         images = row[keys[2]]
@@ -225,7 +222,7 @@ def print_graph_stat(folder: str):
         tru = {}
         for run in runs:
             question = run.task.task.lower()
-            if not run.task_id in tru:
+            if run.task_id not in tru:
                 tru[run.task_id] = (0, 0)
             tru[run.task_id] = (tru[run.task_id][0] + run.correct, tru[run.task_id][1] + 1)
         print(sum(x[0] / x[1] for x in tru.values()))
@@ -263,7 +260,7 @@ def get(*args, tag=None, tag_exclude='no exclude'):
             for r in aaa:
                 k1 = getattr(r, args[1].__name__.lower())
                 k2 = getattr(r, args[2].__name__.lower())
-                if not k2 in ret[k1]:
+                if k2 not in ret[k1]:
                     ret[k1][k2] = []
                 ret[k1][k2].append(r)
             return ret

@@ -7,10 +7,10 @@ question: {question}
 crop the area related to the question in curly braces like this: {{x1, y1, x2, y2}}, e.g. {{0, 0, 1000, 1000}}. (x1, y1, x2, y2 are normalized the coordinates of the bounding box, in [0, 1000])
 """
 
-MASK_CAPTION = f"""You are a helpful assistant that captions masks.
+MASK_CAPTION = """You are a helpful assistant that captions masks.
 please caption the masked area. notice, only the 1st image is the object you should describe. the other images are just for context, and should not be described.
 
-please think step by step, and place your final caption in curly braces like this: {{your_caption}}.
+please think step by step, and place your final caption in curly braces like this: {your_caption}.
 """
 
 

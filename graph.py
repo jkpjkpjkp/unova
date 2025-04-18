@@ -2,13 +2,10 @@ import re
 import functools
 import sys
 from image_shelve import callopenai
-import os
-from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, remove, count_rows, get_strongest_graph, get_strongest_graph, where
-from tqdm import tqdm
+from db import Graph, Task, Run, go, Groph, Ron, get_graph_from_a_folder, get, get_strongest_graph, where
 import asyncio
 from typing import Tuple
 import random
-import math
 from typing import Optional
 import argparse
 
@@ -127,7 +124,7 @@ async def judge(output, answer):
             else:
                 return False, {}
         else:
-            print(f"No {{...}} found in output, falling back to LLM judge.")
+            print("No {...} found in output, falling back to LLM judge.")
             return await llm_judge(output, answer)
 
     except Exception as e:

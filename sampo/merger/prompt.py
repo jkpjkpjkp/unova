@@ -13,4 +13,3 @@ MP = """Here are 2 workflows with different strengths. try to combine and merge 
 you should follow this xml format and split your graph class and prompt definition code.
 """
 
-from sampo.bflow.prompt import CUSTOM_USE

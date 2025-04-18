@@ -1,9 +1,3 @@
-from PIL import Image
-from io import BytesIO
-import base64
-import asyncio
-import numpy as np
-import re
 from ve import VE
 from pydantic import BaseModel
 
@@ -20,7 +14,7 @@ class Graph:
         class splitaggregate(BaseModel):
             subquestion: str
             aggregation: str
-        return self.custom(f"""we plan to split the image for this question into parts, and we now need you to write subquestion for every part of the image.
+        return self.custom("""we plan to split the image for this question into parts, and we now need you to write subquestion for every part of the image.
 
 1. please write the subquestion asked for every part of the image
 2. please write an aggregation statement that combines sub parts' answers into an answer of the original question. 

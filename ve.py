@@ -1,6 +1,5 @@
-import re
 from PIL import Image
-from typing import Literal, Self, Iterator
+from typing import Self, Iterator
 import functools
 import numpy as np
 
