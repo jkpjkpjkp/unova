@@ -4,7 +4,7 @@ import base64
 import asyncio
 import numpy as np
 import re
-
+from ve import VE
 
 
 class Graph:
@@ -19,5 +19,5 @@ class Graph:
     async def run(self, question: list[VE | str]) -> str:
         image = question[0]
         image = self.crop(image)
-        response = self.aggregate(map(self.subproblem_generation(question[1]), self.sam(image))
-        return resposne
+        response = self.aggregate(map(self.subproblem_generation(question[1]), self.sam(image)))
+        return response
