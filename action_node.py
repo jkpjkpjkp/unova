@@ -8,7 +8,10 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 import openai
 from loguru import logger
 import functools
+import itertools
 from llmpostprocess import llm_output_postprocess
+import base64
+from io import BytesIO
 
 TAG = "CONTENT"
 
@@ -55,7 +58,7 @@ class LLM:
                 {"role": "system", "content": system_msgs or "You are a helpful assistant."},
                 {"role": "user", "content": [
                     {"type": "text", "text": prompt},
-                    *list.concat(image.present() for image in images)
+                    *({"type": "image_url", "image_url": {"url": base64.encode(BytesIO(img))}} for img in itertools.chain(image.present for image in images))
                 ]}
             ),
         ).choices[0].message.content

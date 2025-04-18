@@ -1,15 +1,7 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Desc   : base llm postprocess plugin to do the operations like repair the raw llm output
-
 from typing import Union
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Desc   : repair llm raw output with particular conditions
-
 import copy
 from enum import Enum
-from typing import Callable, Optional, Union
+from typing import Callable, Union
 import re
 from tenacity import RetryCallState, retry, stop_after_attempt, wait_fixed
 import loguru

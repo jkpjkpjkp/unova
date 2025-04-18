@@ -44,15 +44,14 @@ class VisualEntity:
     @property
     def bbox(self):
         return self.image.getbbox()
-    def present(self, mode='raw'):
+    def present(self, mode='raw') -> list[Image.Image]:
         if mode == 'raw':
-            return self.crop(self.image)
+            return [self.crop(self.image)]
         elif mode == 'box':
-            return self.crop(self.image).to('RGB')
+            return [self.crop(self.image).to('RGB')]
         elif mode == 'cascade':
             center = tuple(int, int)(self.center())
             x, y = self.bbox // 2
-            for _ in range(3):
-                
+            return [self.crop(xyxy=(center[0]-x*2**i, center[1]-y*2**i, center[0]+x*2**i, center[1]+y*2**i)) for i in range(3)]
 
 VE = VisualEntity
