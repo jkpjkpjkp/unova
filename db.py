@@ -7,18 +7,15 @@ import os
 from PIL import Image
 import functools
 import numpy as np
-import hashlib
-from typing import Any, Iterable, Optional, Union, Literal
+from typing import Iterable, Union, Literal
 import base64
 import binascii
 import io
 import re
 import openai
-import os
 import json
 from tqdm import tqdm
 from gradio_client import Client, handle_file
-import numpy as np
 import tempfile
 import contextlib
 import fcntl

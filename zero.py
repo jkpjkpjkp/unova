@@ -2,9 +2,6 @@ import polars as pl
 
 df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
 
-print(df.columns) # ['question_id', 'question_text', 'question_images_decoded', 'question_answer', 'question_images', 'image_attribution']
-print(df.head())
-print(df.row(0, named=True).keys())
 
 def display_image():
     first_row = df.row(0, named=True)
@@ -17,8 +14,11 @@ def display_image():
     #     print(image.keys())
     #     image = Image.open(BytesIO(image['bytes']))
     #     image.show()
-
-display_image()
+if __name__ == "__main__":
+    print(df.columns) # ['question_id', 'question_text', 'question_images_decoded', 'question_answer', 'question_images', 'image_attribution']
+    print(df.head())
+    print(df.row(0, named=True).keys())
+    display_image()
 
 # holy_grail = pl.read_ndjson('/mnt/home/jkp/hack/tmp/MetaGPT/counting_zero.jsonl')
 
