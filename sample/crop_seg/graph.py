@@ -19,7 +19,7 @@ class Graph:
     
     async def run(self, question: tuple[VE, str]) -> str:
         image = question[0]
-        image = self.crop(image)
+        image = await self.crop(*question)
         subquestion, aggregation = self.subproblem_generation(question[1])
         response = self.aggregate(aggregation, map(self.custom(subquestion), self.sam(image)))
         return response

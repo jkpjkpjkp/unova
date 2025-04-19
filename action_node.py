@@ -34,7 +34,12 @@ class LLM:
         ]
         # Only add image content if images list is not empty
         if images:
-            image_content = [{"type": "image_url", "image_url": {"url": base64.b64encode(BytesIO(img).read()).decode()}} for img in itertools.chain(getattr(image, 'present', image) for image in images)]
+
+            def to_base64(image: Image.Image):
+                buffered = BytesIO()
+                image.save(buffered, format="JPEG")
+                img_str = base64.b64encode(buffered.getvalue())
+            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in itertools.chain(getattr(image, 'present', image) for image in images)]
             if isinstance(messages[1]["content"], list):
                 messages[1]["content"].extend(image_content)
             else: # Should not happen based on current structure, but good practice
@@ -1415,7 +1420,7 @@ class Crop(Operator):
         super().__init__(llm or LLM(), name)
     
     async def __call__(self, image, question):
-        bbox = await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=image,mode='xml_fill')['bbox']
+        bbox = (await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=image,mode='xml_fill'))['bbox']
         return image.crop1000(bbox)
 
 def test_crop():
