@@ -23,3 +23,25 @@ display_image()
 # holy_grail = pl.read_ndjson('/mnt/home/jkp/hack/tmp/MetaGPT/counting_zero.jsonl')
 
 # print(holy_grail.head())
+from PIL import Image
+import io
+import polars as pl
+
+def get_task_data(task_id):
+    filtered_df = df.filter(pl.col('question_id') == task_id)
+    
+    assert filtered_df.height == 1, f"Task ID {task_id} not found or duplicate."
+
+    row = filtered_df.row(0, named=True)
+    
+    question_text = row['question_text']
+
+    images = row['question_images_decoded']
+    
+    assert len(images) == 1, f"Task ID {task_id} does not have exactly one image."
+    
+    image_data = images[0]['bytes']
+    
+    image = Image.open(io.BytesIO(image_data))
+    
+    return (image, question_text)

@@ -99,41 +99,14 @@ class MyHash:
         return self.__hash__() == other.__hash__()
 
 
-class ImageHashToID(SQLModel, table=True):
-    id: bytes = Field(primary_key=True) # long hash
-    short_hash: str
-
-
 class Graph(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph: str
     prompt: str
-    tags: list[str] = Field(sa_column=Column(JSON))
 
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
     
-    @property
-    def experience(self):
-        return [(x.modification, x.graph.score) for x in get(Ron, Graph, tag=tag)[self]]
-    
-    @property
-    def score(self):
-        rund = get(Run, Graph, Task)[self]
-        if not rund:
-            return 0.5
-        return (sum(sum(run.correct for run in runs) / len(runs) for runs in rund.values()) + 1) / (len(rund) + 2)
-
-
-class Task(MyHash, SQLModel, table=True):
-    id: bytes = Field(primary_key=True)
-    task: str
-    answer: str
-    tags: list[str] = Field(sa_column=Column(JSON))
-
-    runs: list["Run"] = Relationship(back_populates="task")
-    _hash_fields = ('task', 'answer')
-
 
 class RonRunLink(SQLModel, table=True):
     ron_id: Optional[bytes] = Field(default=None, foreign_key="ron.id", primary_key=True)
@@ -143,14 +116,12 @@ class RonRunLink(SQLModel, table=True):
 class Run(MyHash, SQLModel, table=True):
     id: bytes = Field(primary_key=True)
     graph_id: bytes = Field(foreign_key="graph.id")
-    task_id: bytes = Field(foreign_key="task.id")
+    task_id: str
     log: Dict[str, Any] = Field(sa_column=Column(JSON))
     final_output: str | None = Field(default=None)
     correct: bool
-    tags: list[str] = Field(sa_column=Column(JSON))
 
     graph: Graph = Relationship(back_populates="runs")
-    task: Task = Relationship(back_populates="runs")
     used_in: List["Ron"] = Relationship(back_populates="runs", link_model=RonRunLink)
     _hash_fields = ('graph_id', 'task_id', 'log', 'tags')
 
@@ -207,8 +178,7 @@ def DANGER_DANGER_DANGER_remove_dangling():  # everything with illegal foreign k
             ~RonRunLink.run_id.in_(select(Run.id))
         ))
         session.exec(delete(Run).where(
-            ~Run.graph_id.in_(select(Graph.id)) |
-            ~Run.task_id.in_(select(Task.id))
+            ~Run.graph_id.in_(select(Graph.id))
         ))
         session.exec(delete(Ron).where(
             ~Ron.groph_id.in_(select(Groph.id)) |
@@ -516,8 +486,6 @@ def str_go(x: str) -> Optional[Image.Image]:
 def go(x: Any):
     if isinstance(x, Image.Image):
         return img_go(x)
-    if isinstance(x, VE):
-
     elif isinstance(x, str):
         return str_go(x)
     elif isinstance(x, bytes):

@@ -1437,7 +1437,7 @@ def _sam2(image):
         os.remove(image_path)
     return np.array([np.array(Image.open(x['image'])) for x in result])
 
-def sam2(image: VE) -> VE
+def sam2(image: VE) -> VE:
     return VE(_sam2(image.image))
 
 operators = {
