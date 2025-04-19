@@ -20,7 +20,8 @@ from tqdm import tqdm
 from gradio_client import Client, handle_file
 import numpy as np
 import tempfile
-
+import contextlib
+import fcntl
 
 class VisualEntity:
     _img: Image.Image | list['VisualEntity']
@@ -441,6 +442,29 @@ def int_to_0aA(i):
         i //= 62
     return s
 
+
+# Define a context manager for file locking
+@contextlib.contextmanager
+def flock_fd(fd):
+    fcntl.flock(fd, fcntl.LOCK_EX)  # Acquire an exclusive lock
+    try:
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)  # Release the lock
+
+# Ensure the file exists with an initial value of 0
+if not os.path.exists('.image_count'):
+    with open('.image_count', 'w') as f:
+        f.write('0')
+
+# Open the file, lock it, and increment the counter
+with open('.image_count', 'r+') as f:
+    with flock_fd(f.fileno()):
+        tot = int(f.read()) + 1
+        f.seek(0)
+        f.write(str(tot))
+        f.truncate()
+
 def _img_go(image: Image.Image):
     image = image.convert('RGB')
     long_hash = hashlib.sha256(image.tobytes()).hexdigest()
@@ -452,11 +476,12 @@ def _img_go(image: Image.Image):
             migra_db[short_hash] = image
             return short_hash
         return short_hash
-    with fcntl.flock(fcntl.open('.image_count', fcntl.O_RDWR), fcntl.LOCK_EX):
-        with open('.image_count', 'r+') as f:
+    with open('.image_count', 'r+') as f:
+        with flock_fd(f.fileno()):
             tot = int(f.read()) + 1
             f.seek(0)
             f.write(str(tot))
+            f.truncate()
     # short_hash = int_to_0aA(tot)
     # long_hash_to_short_hash[long_hash] = short_hash
     # _short_hash_to_image[short_hash] = image

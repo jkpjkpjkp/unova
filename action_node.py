@@ -17,6 +17,7 @@ import loguru
 from json import JSONDecodeError
 from json.decoder import _decode_uXXXX
 import asyncio
+from PIL import Image
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -1265,6 +1266,13 @@ class ActionNode:
         :param exclude: The keys of ActionNode to exclude.
         :return: self
         """
+        def to_base64(image: Image.Image):
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            img_str = base64.b64encode(buffered.getvalue())
+        if isinstance(images, list):
+            images = [to_base64(x) if isinstance(x, Image.Image) else x for x in images]
+        
         self.set_llm(llm)
         self.set_context(context)
         if self.schema:
