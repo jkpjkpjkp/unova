@@ -1237,6 +1237,12 @@ class ActionNode:
                             raise ValueError
                     except:
                         extracted_data[field_name] = {}  # 默认空字典
+                else:
+                    extracted_data[field_name] = raw_value
+            else:
+                print(context)
+                print(field_names)
+                print(field_types)
 
         return extracted_data
 
@@ -1293,8 +1299,7 @@ class ActionNode:
         elif mode == FillMode.XML_FILL.value:
             context = self.xml_compile(context=self.context)
             result = await self.xml_fill(context, images=images)
-            print(result)
-            self.instruct_content = self.create_class()(**result)
+            self.instruct_content = self.dantic(**result)
             return self
 
         elif mode == FillMode.SINGLE_FILL.value:
@@ -1342,6 +1347,7 @@ class ActionNode:
 
             root_node.add_child(child_node)
 
+        root_node.dantic = model
         return root_node
 
     @staticmethod
@@ -1356,13 +1362,14 @@ class ActionNode:
 
 class GenerateOp(BaseModel):
     response: str = Field(default="", description="Your solution for this problem")
-
 def parse_bbox_string(v: str) -> Tuple[int, int, int, int]:
-    match = re.search(r'<bbox>(\d+)\s+(\d+)\s+(\d+)\s+(\d+)</bbox>', v)
-    if not match:
-        raise ValueError("Invalid bbox format; expected '<bbox>num num num num</bbox>'")
-    return tuple(int(x) for x in match.groups())
-
+    try:
+        numbers = v.split()
+        if len(numbers) != 4:
+            raise ValueError("Expected four numbers in bbox string")
+        return tuple(int(num) for num in numbers)
+    except (ValueError, TypeError):
+        raise ValueError("Invalid bbox format; expected 'num num num num'")
 BBoxType = Annotated[Tuple[int, int, int, int], BeforeValidator(parse_bbox_string)]
 
 class CropOp(BaseModel):
@@ -1441,4 +1448,13 @@ operators = {
 }
 
 if __name__ == '__main__':
-    print(asyncio.run(Custom(LLM())('hi! ')))
+    # Create the ActionNode from the CropOp model and generate the class
+    
+    # Instantiate the class with the intended field values
+    instance = CropOp(
+        thought="The question asks about the number of copies of 'a bit of everything' in the top right stack. I need to identify the bounding box that contains only the top right stack of books labeled 'a bit of everything'.",
+        bbox='25 542 315 915'
+    )
+    
+    # Output the result
+    print(instance)

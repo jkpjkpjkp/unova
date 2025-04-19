@@ -4,8 +4,6 @@ import io
 
 df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
 
-tasks = df['question_id'].to_list()
-print(tasks)
 
 def display_image():
     first_row = df.row(0, named=True)
@@ -19,6 +17,9 @@ def display_image():
     #     image = Image.open(BytesIO(image['bytes']))
     #     image.show()
 if __name__ == "__main__":
+
+    tasks = df['question_id'].to_list()
+    print(tasks)
     print(df.columns) # ['question_id', 'question_text', 'question_images_decoded', 'question_answer', 'question_images', 'image_attribution']
     print(df.head())
     print(df.row(0, named=True).keys())

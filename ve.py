@@ -75,7 +75,7 @@ class VisualEntity:
         return self._img.crop(xyxy or self.bbox)
     def crop1000(self, box: tuple):
         x, y = self.shape
-        return self.crop(box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y)
+        return self.crop((box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y))
     
     @property
     def image(self):
