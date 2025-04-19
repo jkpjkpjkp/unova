@@ -31,26 +31,18 @@ class Graph(MyHash, SQLModel, table=True):
     @property
     def run(self):
         graph_code = self.graph + '\n' + self.prompt
-        namespace = {}
-        namespace['__name__'] = '__exec__'
-        namespace['__package__'] = None
-        
-        if graph_code.endswith('"""'):
-            pass
-        elif graph_code.endswith('""'):
-            graph_code += '"'
+        namespace = {'__name__': '__exec__', '__package__': None}
         
         try:
             exec(graph_code, namespace)
+            graph = namespace.get("Graph")(operators=operators, prompt_custom=namespace)
         except Exception:
-            print("--- Executing graph code ---")
+            print("--- Error reading graph code ---")
             print(graph_code)
-            print("--- End graph code ---")
+            print("--- error ---")
             raise
-        Graph = namespace.get("Graph")
-        graph = Graph(operators=operators, prompt_custom=namespace)
 
-        def extract_local_variables(func):
+        def extract_local_variables_wrapper(func):
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):
                 original = sys.gettrace()
@@ -71,8 +63,11 @@ class Graph(MyHash, SQLModel, table=True):
                 captured_locals.pop('self')
                 return result, captured_locals
             return wrapper
-        return extract_local_variables(graph.run)
-
+        
+        def log_to_db_wrapper(func):
+            @functools.wraps(func)
+        
+        return extract_local_variables_wrapper(graph.run)
 
 
 class Run(MyHash, SQLModel, table=True):
