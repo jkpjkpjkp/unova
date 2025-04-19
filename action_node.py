@@ -1342,6 +1342,11 @@ class GenerateOp(BaseModel):
     response: str = Field(default="", description="Your solution for this problem")
 
 
+class CropOp(BaseModel):
+    thought: str = Field(default="", description="Thoughts on what crop may be sufficient.")
+    bbox: tuple[int, int, int, int] = Field(default=[], description="a crop containing all relevant information, in x y x y format, idx from 0 to 1000")
+
+
 def custom(input, model='gemini-2.0-flash', dna=GenerateOp):
     return asyncio.run(ActionNode.from_pydantic(dna).fill(context=input, llm=LLM(model=model)))
 
@@ -1391,7 +1396,21 @@ class Custom(Operator):
         response = await self._fill_node(pydantic_model, prompt, mode=mode)
         return response
 
+CROP_PROMPT = """We are trying to remove irrelevant information from an image.
+Given a question and its image, please output the bounding box within which the information necessary for answering this question entirely lies.
+
+question: {question}
+"""
+class Crop(Operator):
+    def __init__(self, llm: LLM = None, name: str = "Crop"):
+        super().__init__(llm or LLM(), name)
+    
+    async def __call__(self, image, question):
+        bbox = await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=image,mode='xml_fill')['bbox']
+        return image.crop1000(bbox)
+
+def test_crop():
+    crop = Crop()()
 
 if __name__ == '__main__':
-    
     print(asyncio.run(Custom(LLM())('hi! ')))
