@@ -100,9 +100,9 @@ class VisualEntity:
                 draw = ImageDraw.Draw(img)
                 bbox = img.getbbox()
                 if bbox:  # Only draw if there’s a non-transparent region
-                    x = (bbox[0] + bbox[2]) / 2  # Center x-coordinate
-                    y = (bbox[1] + bbox[3]) / 2  # Center y-coordinate
-                    font = ImageFont.load_default()  # Use default font
+                    x = (bbox[0] + bbox[2]) / 2
+                    y = (bbox[1] + bbox[3]) / 2
+                    font = ImageFont.load_default()
                     text = str(number)
                     draw.text((x, y), text, fill='red', font=font, anchor='mm')  # Center the text
                 return img

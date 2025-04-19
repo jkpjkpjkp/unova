@@ -1128,6 +1128,7 @@ class ActionNode:
     async def simple_fill(
         self, schema, mode, images: Optional[Union[str, list[str]]] = None, timeout=10, exclude=None
     ):
+        print(context)
         prompt = self.compile(context=self.context, schema=schema, mode=mode, exclude=exclude)
         if schema != "raw":
             mapping = self.get_mapping(mode, exclude=exclude)
@@ -1254,7 +1255,7 @@ class ActionNode:
         schema="json",
         mode="auto",
         strgy="simple",
-        images: Optional[Union[str, list[str]]] = None,
+        images: list[Image.Image] = list(),
         timeout=10,
         exclude=[],
         function_name: str = None,
@@ -1279,22 +1280,24 @@ class ActionNode:
         :param exclude: The keys of ActionNode to exclude.
         :return: self
         """
-        def to_base64(image: Image.Image):
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG")
-            img_str = base64.b64encode(buffered.getvalue())
-        if isinstance(images, list):
-            images = [to_base64(x) if isinstance(x, Image.Image) else x for x in images]
-        
         self.set_llm(llm)
         self.set_context(context)
         if self.schema:
             schema = self.schema
+        
+        if isinstance(context, tuple):
+            for x in context:
+                assert isinstance(x, str) or isinstance(x, Image.Image)
+            images.extend([x for x in context if isinstance(x, Image.Image)])
+            context = '\n'.join(x for x in context if isinstance(x, str))
 
-        if mode == FillMode.CODE_FILL.value:
-            result = await self.code_fill(context, function_name, timeout)
-            self.instruct_content = self.create_class()(**result)
-            return self
+        def to_base64(image: Image.Image):
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue())
+        if isinstance(images, list):
+            images = [to_base64(x) if isinstance(x, Image.Image) else x for x in images]
+        
 
         elif mode == FillMode.XML_FILL.value:
             context = self.xml_compile(context=self.context)
@@ -1422,9 +1425,7 @@ class Custom(Operator):
         super().__init__(llm or LLM(), name)
 
     async def __call__(self, input, pydantic_model=GenerateOp, mode: Literal["single_fill", "xml_fill", "code_fill"] = "single_fill"):
-        prompt = input
-        response = await self._fill_node(pydantic_model, prompt, mode=mode)
-        return response
+        return await self._fill_node(pydantic_model, input, mode=mode)
 
 CROP_PROMPT = """We are trying to remove irrelevant information from an image.
 Given a question and its image, please output the bounding box within which the information necessary for answering this question entirely lies.
