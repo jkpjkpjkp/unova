@@ -1,11 +1,85 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select, delete
 from sqlalchemy import Column, func
 from sqlalchemy.types import JSON
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Self, Iterator
 import hashlib
 import os
-from image_shelve import go as img_go
+from PIL import Image
+import functools
+import numpy as np
+import hashlib
+from typing import Any, Iterable, Optional, Union, Literal
+import base64
+import binascii
+import io
+import re
+import openai
+import os
+import json
+from tqdm import tqdm
+from gradio_client import Client, handle_file
+import numpy as np
+import tempfile
 
+
+class VisualEntity:
+    _img: Image.Image | list['VisualEntity']
+
+    def __init__(self, img: Image.Image | list[Self]):
+        self._img = img
+    def __iter__(self) -> Iterator[Self]:
+        if isinstance(self._img, Image.Image):
+            yield self
+        else:
+            return iter(self._img)
+    def __len__(self):
+        return len(self._img) if isinstance(self._img, list) else 1
+    def __getitem__(self, item) -> Self:
+        if isinstance(self._img, Image.Image):
+            assert item == 0
+            return self
+        else:
+            return self._img[item]
+    def __add__(self, other: Self) -> Self:
+        l = self._img if isinstance(self._img, list) else [self]
+        r = other._img if isinstance(other._img, list) else [other]
+        return VisualEntity(l + r)
+    
+    @property
+    def center(self):
+        return np.average(np.where(self._img.to_numpy()))
+    @property
+    def area(self) -> int:
+        return sum(self.image.getdata(band=3) / 255)
+    @property
+    def shape(self):
+        img = self._img if isinstance(self._img, Image.Image) else self._img[0]
+        return img.width, img.height
+    
+    def crop(self, xyxy: tuple[int, int, int, int] | None = None):
+        assert isinstance(self._img, Image.Image)
+        return Self(self._img.crop(xyxy or self.bbox))
+    def crop1000(self, box: tuple):
+        x, y = self.shape
+        return self.crop(box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y)
+    
+    @property
+    def image(self):
+        return self._img if isinstance(self._img, Image.Image) else functools.reduce(lambda a, b: a.alpha_composite(b), self._img, initial=Image.new('RGBA', self._img[0].size, (0, 0, 0, 0)))
+    @property
+    def bbox(self):
+        return self.image.getbbox()
+    def present(self, mode='raw') -> list[Image.Image]:
+        if mode == 'raw':
+            return [self.crop(self.image)]
+        elif mode == 'box':
+            return [self.crop(self.image).to('RGB')]
+        elif mode == 'cascade':
+            center = tuple(int, int)(self.center())
+            x, y = self.bbox // 2
+            return [self.crop(xyxy=(center[0]-x*2**i, center[1]-y*2**i, center[0]+x*2**i, center[1]+y*2**i)) for i in range(3)]
+
+VE = VisualEntity
 db_name = "main.db"
 tag='zerobench'
 
@@ -22,6 +96,11 @@ class MyHash:
     
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
+
+
+class ImageHashToID(SQLModel, table=True):
+    id: bytes = Field(primary_key=True) # long hash
+    short_hash: str
 
 
 class Graph(MyHash, SQLModel, table=True):
@@ -330,26 +409,6 @@ def test_find_hardest_tasks():
     assert len(ret) == 2
     assert isinstance(ret[0], Task)
 
-import shelve
-from PIL import Image
-import hashlib
-from typing import Any, Iterable, Optional, Union, Literal
-import base64
-import binascii
-import io
-import re
-import openai
-import os
-import json
-from tqdm import tqdm
-from gradio_client import Client, handle_file
-import numpy as np
-import tempfile
-
-_short_hash_to_image = shelve.open('image.shelve')
-long_hash_to_short_hash = shelve.open('long_to_short.shelve')
-migra_db = shelve.open('migra_db.shelve')
-
 def print_all_long_hash_to_short_hash():
     for key, value in long_hash_to_short_hash.items():
         print(f"{key}: {value}")
@@ -393,11 +452,11 @@ def _img_go(image: Image.Image):
             migra_db[short_hash] = image
             return short_hash
         return short_hash
-    # with fcntl.flock(fcntl.open('.image_count', fcntl.O_RDWR), fcntl.LOCK_EX):
-    #     with open('.image_count', 'r+') as f:
-    #         tot = int(f.read()) + 1
-    #         f.seek(0)
-    #         f.write(str(tot))
+    with fcntl.flock(fcntl.open('.image_count', fcntl.O_RDWR), fcntl.LOCK_EX):
+        with open('.image_count', 'r+') as f:
+            tot = int(f.read()) + 1
+            f.seek(0)
+            f.write(str(tot))
     # short_hash = int_to_0aA(tot)
     # long_hash_to_short_hash[long_hash] = short_hash
     # _short_hash_to_image[short_hash] = image
@@ -432,6 +491,8 @@ def str_go(x: str) -> Optional[Image.Image]:
 def go(x: Any):
     if isinstance(x, Image.Image):
         return img_go(x)
+    if isinstance(x, VE):
+
     elif isinstance(x, str):
         return str_go(x)
     elif isinstance(x, bytes):
@@ -471,8 +532,7 @@ async def extract_image(x: str):
 
 def depth_estimator(image):
     client = Client("http://localhost:7860/")
-    if not isinstance(image, Image.Image):
-        raise ValueError("image must be a PIL Image")
+    assert isinstance(image, Image.Image)
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
         image.save(temp_file.name)
         image_path = temp_file.name

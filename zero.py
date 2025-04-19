@@ -1,8 +1,8 @@
 import polars as pl
 
-df = pl.read_parquet('/home/jkp/Téléchargements/mmiq-00000-of-00001.parquet')
+df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
 
-print(df.schema)
+print(df.columns) # ['question_id', 'question_text', 'question_images_decoded', 'question_answer', 'question_images', 'image_attribution']
 print(df.head())
 print(df.row(0, named=True).keys())
 
