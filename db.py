@@ -20,206 +20,62 @@ import tempfile
 import contextlib
 import fcntl
 
-class VisualEntity:
-    _img: Image.Image | list['VisualEntity']
-
-    def __init__(self, img: Image.Image | list[Self]):
-        self._img = img
-    def __iter__(self) -> Iterator[Self]:
-        if isinstance(self._img, Image.Image):
-            yield self
-        else:
-            return iter(self._img)
-    def __len__(self):
-        return len(self._img) if isinstance(self._img, list) else 1
-    def __getitem__(self, item) -> Self:
-        if isinstance(self._img, Image.Image):
-            assert item == 0
-            return self
-        else:
-            return self._img[item]
-    def __add__(self, other: Self) -> Self:
-        l = self._img if isinstance(self._img, list) else [self]
-        r = other._img if isinstance(other._img, list) else [other]
-        return VisualEntity(l + r)
-    
-    @property
-    def center(self):
-        return np.average(np.where(self._img.to_numpy()))
-    @property
-    def area(self) -> int:
-        return sum(self.image.getdata(band=3) / 255)
-    @property
-    def shape(self):
-        img = self._img if isinstance(self._img, Image.Image) else self._img[0]
-        return img.width, img.height
-    
-    def crop(self, xyxy: tuple[int, int, int, int] | None = None):
-        assert isinstance(self._img, Image.Image)
-        return Self(self._img.crop(xyxy or self.bbox))
-    def crop1000(self, box: tuple):
-        x, y = self.shape
-        return self.crop(box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y)
-    
-    @property
-    def image(self):
-        return self._img if isinstance(self._img, Image.Image) else functools.reduce(lambda a, b: a.alpha_composite(b), self._img, initial=Image.new('RGBA', self._img[0].size, (0, 0, 0, 0)))
-    @property
-    def bbox(self):
-        return self.image.getbbox()
-    def present(self, mode='raw') -> list[Image.Image]:
-        if mode == 'raw':
-            return [self.crop(self.image)]
-        elif mode == 'box':
-            return [self.crop(self.image).to('RGB')]
-        elif mode == 'cascade':
-            center = tuple(int, int)(self.center())
-            x, y = self.bbox // 2
-            return [self.crop(xyxy=(center[0]-x*2**i, center[1]-y*2**i, center[0]+x*2**i, center[1]+y*2**i)) for i in range(3)]
-
-VE = VisualEntity
 db_name = "main.db"
 tag='zerobench'
 
 
 class MyHash:
-    @property
-    def hash(self):
-        code = '\n'.join(str(getattr(self, field)) for field in self._hash_fields)
-        self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id
-    
     def __hash__(self):
-        return int.from_bytes(self.id or self.hash, 'big')
-    
+        def hash():
+            code = '\n'.join(str(getattr(self, field)) for field in self._hash_fields)
+            self.id = hashlib.sha256(code.encode('utf-8')).digest()
+        return self.id or int.from_bytes(hash(), 'big')
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
 
 
 class Graph(MyHash, SQLModel, table=True):
-    id: bytes = Field(primary_key=True)
+    id: int = Field(primary_key=True)
     graph: str
     prompt: str
 
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
-    
-
-class RonRunLink(SQLModel, table=True):
-    ron_id: Optional[bytes] = Field(default=None, foreign_key="ron.id", primary_key=True)
-    run_id: Optional[bytes] = Field(default=None, foreign_key="run.id", primary_key=True)
 
 
 class Run(MyHash, SQLModel, table=True):
-    id: bytes = Field(primary_key=True)
-    graph_id: bytes = Field(foreign_key="graph.id")
-    task_id: str
+    graph_id: int = Field(primary_key=True, foreign_key="graph.id")
+    task_id: str = Field(primary_key=True)
     log: Dict[str, Any] = Field(sa_column=Column(JSON))
     final_output: str | None = Field(default=None)
     correct: bool
 
     graph: Graph = Relationship(back_populates="runs")
-    used_in: List["Ron"] = Relationship(back_populates="runs", link_model=RonRunLink)
     _hash_fields = ('graph_id', 'task_id', 'log', 'tags')
-
-
-class Groph(MyHash, SQLModel, table=True):
-    id: bytes = Field(primary_key=True)
-    graph: str
-    prompt: str
-    tags: list[str] = Field(sa_column=Column(JSON))
-
-    rons: list["Ron"] = Relationship(back_populates="groph")
-    _hash_fields = ('graph', 'prompt')
-
-
-class Ron(MyHash, SQLModel, table=True):
-    id: bytes = Field(primary_key=True)
-    groph_id: bytes = Field(foreign_key='groph.id')
-    runs: List["Run"] = Relationship(back_populates="used_in", link_model=RonRunLink)
-    log: Dict[str, Any] = Field(sa_column=Column(JSON))
-    final_output: bytes = Field(foreign_key='graph.id')
-    tags: list[str] = Field(sa_column=Column(JSON))
-
-    groph: Groph = Relationship(back_populates='rons')
-    _hash_fields = ('groph_id', 'log', 'tags')
-
-    @property
-    def graph(self):
-        return self.runs[0].graph
-
-    @property
-    def new_graph(self):
-        return get_by_id(Graph, self.new_graph_id)
-    
-    @property
-    def modification(self):
-        return self.log['modification']
 
 
 _engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(_engine)
 
 
-def test_ron_has_runid():
-    with Session(_engine) as session:
-        ron = session.exec(select(Ron)).first()
-        assert ron.id
-        assert len(ron.runs)
-
-
-def DANGER_DANGER_DANGER_remove_dangling():  # everything with illegal foreign key (no related main key) is deleted
-    with Session(_engine) as session:
-        session.exec(delete(RonRunLink).where(
-            ~RonRunLink.ron_id.in_(select(Ron.id)) |
-            ~RonRunLink.run_id.in_(select(Run.id))
-        ))
-        session.exec(delete(Run).where(
-            ~Run.graph_id.in_(select(Graph.id))
-        ))
-        session.exec(delete(Ron).where(
-            ~Ron.groph_id.in_(select(Groph.id)) |
-            ~Ron.final_output.in_(select(Graph.id))
-        ))
-        session.commit()
-
-
-def go(x):
-    x.id = x.id or x.hash
+def put(x):
+    x.id = x.id or x.__hash__()
     with Session(_engine) as session:
         merged_x = session.merge(x)
         session.commit()
         session.refresh(merged_x)
     return merged_x
 
+
 def get_graph_from_a_folder(folder: str, groph: bool = False):
     with open(os.path.join(folder, "graph.py"), "r") as f:
         graph = f.read()
     with open(os.path.join(folder, "prompt.py"), "r") as f:
         prompt = f.read()
-    graph = (Graph if not groph else Groph)(graph=graph, prompt=prompt)
-    return go(graph)
+    graph = Graph(graph=graph, prompt=prompt)
+    return put(graph)
 
-def get_by_id(ret_type, id: bytes):
-    with Session(_engine) as session:
-        return session.exec(select(ret_type).where(ret_type.id == id)).first()
 
-def read_tasks_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
-    import polars as pl
-    from tqdm import tqdm
-    df = pl.read_parquet(filepath)
-    for row in tqdm(df.iter_rows(named=True)):
-        images = row[keys[2]]
-        images = [x['bytes'] for x in images] if isinstance(images, list) else [images['bytes']]
-        images = img_go(images)
-        if isinstance(images, list):
-            images = ' '.join(images)
-        tags = []
-        if tag:
-            tags.append(tag)
-        if tag_key:
-            tags.append(row[tag_key])
-        go(Task(task=images + ' ' + row[keys[0]], answer=str(row[keys[1]]), tags=tags))
 def recover_image_from_a_parquet(filepath: str | list[str], tag: Optional[str] = None, keys: Tuple[str, str, str] = ('question_text', 'question_answer', 'question_images_decoded'), tag_key: Optional[str] = None):
     import polars as pl
     from tqdm import tqdm
@@ -236,19 +92,10 @@ def test_get_graph_from_a_folder():
     get_graph_from_a_folder("sample/cot")
     with Session(_engine) as session:
         print(len(session.exec(select(Graph)).all()))
-def test_get_groph_from_a_folder():
-    with Session(_engine) as session:
-        print(len(session.exec(select(Groph)).all()))
-    get_graph_from_a_folder("sampo/bflow", groph=True)
-    with Session(_engine) as session:
-        print(len(session.exec(select(Groph)).all()))
-def test_read_tasks_from_a_parquet():
-    with Session(_engine) as session:
-        print(len(session.exec(select(Task)).all()))
-    read_tasks_from_a_parquet("/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet", tag='zerobench')
-    with Session(_engine) as session:
-        print(len(session.exec(select(Task)).all()))
 
+def get_by_id(ret_type, id: bytes):
+    with Session(_engine) as session:
+        return session.exec(select(ret_type).where(ret_type.id == id)).first()
 
 def get(*args, tag=None):
     n = len(args)
@@ -275,15 +122,7 @@ def get(*args, tag=None):
                 ret[k1][k2].append(r)
             return ret
         raise ValueError(f"Invalid number of arguments: {n}")
-
-
-
-async def test_get(tag=None):
-    best_graph = get_strongest_graph()
-    task_stat = get_task_stat(tag=tag)
     
-    print(get(Run, Graph, tag=tag)[best_graph])
-    runs_for_best_graph = get(Run, Graph, tag=tag)[best_graph]
 
 def where(x, *args, tag=None):
     print('HERE')
@@ -313,7 +152,7 @@ def test_get():
 def test_count_rows():
     print(count_rows(Run))
 
-def get_strongest_graph():
+def get_strongest_graph(k=1):
     with Session(_engine) as session:
         task_avg_sq = (
             select(
@@ -321,8 +160,6 @@ def get_strongest_graph():
                 Run.task_id,
                 func.avg(Run.correct).label("task_avg"),
             )
-            .join(Task, Run.task_id == Task.id)
-            .where(Task.tags.contains('zerobench'))
             .group_by(Run.graph_id, Run.task_id)
             .subquery("task_averages")
         )
@@ -350,37 +187,25 @@ def get_strongest_graph():
         else:
             raise ValueError("No runs found to determine the strongest graph.")
 
-def find_hardest_tasks(top_n: int = 10, tag=None):
-    with Session(_engine) as session:
-        stmt = (
-            select(Task, func.avg(Run.correct).label("avg_correctness"))
-            .join(Run, Task.id == Run.task_id)
-            .group_by(Task.id)
-            .order_by(func.avg(Run.correct).asc()) # Ascending order for lowest correctness first
-            .limit(top_n)
-        )
-        results = session.exec(stmt).all()
-        if results:
-            print(f"Top {top_n} hardest tasks:")
-            for task, avg_correctness in results:
-                print(f"  Task ID: {task.id}, Avg Correctness: {avg_correctness:.4f}")
-            return [x[0] for x in results]
-        else:
-            print("No runs found to determine hardest tasks.")
-            return []
-
+def get_hardest_task(k=1):
+    TODO
+    
 def test_get_strongest_graph():
     assert isinstance(get_strongest_graph(), Graph)
-def test_find_hardest_tasks():
-    ret = find_hardest_tasks(2)
+def test_get_hardest_task():
+    ret = get_hardest_task(2)
     assert isinstance(ret, list)
     assert len(ret) == 2
-    assert isinstance(ret[0], Task)
+    assert isinstance(ret[0], str)
+
+
+
+
+
 
 def print_all_long_hash_to_short_hash():
     for key, value in long_hash_to_short_hash.items():
         print(f"{key}: {value}")
-
 
 def build_long_hash_from_short_hash():
     for short_hash, image in tqdm(_short_hash_to_image.items()):
@@ -480,7 +305,7 @@ def str_go(x: str) -> Optional[Image.Image]:
     except IOError:
         return x
 
-def go(x: Any):
+def put(x: Any):
     if isinstance(x, Image.Image):
         return img_go(x)
     elif isinstance(x, str):
@@ -488,9 +313,9 @@ def go(x: Any):
     elif isinstance(x, bytes):
         return img_go(Image.open(io.BytesIO(x)))
     elif isinstance(x, dict):
-        return {k: go(v) for k, v in x.items()}
+        return {k: put(v) for k, v in x.items()}
     elif isinstance(x, Iterable):
-        return [go(v) for v in x]
+        return [put(v) for v in x]
     else:
         return x
 
