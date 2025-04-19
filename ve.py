@@ -24,10 +24,13 @@ def sam2(image):
                 input_image=handle_file(image),
                 api_name="/predict"
         )
+    print(result)
+    print(result[0])
     return np.array([np.array(Image.open(x['image'])) for x in result])
 
 def sam2_imagecrop(image):
     ret = sam2(image)
+    print(type(ret))
     def mask_crop(image, mask):
         masked = image.copy()
         alpha_mask = Image.fromarray(mask * 255, mode='L')
@@ -81,12 +84,12 @@ class VisualEntity:
         return self._img if isinstance(self._img, Image.Image) else functools.reduce(lambda a, b: a.alpha_composite(b), self._img, initial=Image.new('RGBA', self._img[0].size, (0, 0, 0, 0)))
     @property
     def bbox(self):
-        return self.image.Ima()
+        return self.image.getbbox()
     def present(self, mode='raw') -> list[Image.Image]:
         if mode == 'raw':
-            return [self.crop(self.image)]
+            return [self.crop()]
         elif mode == 'box':
-            return [self.crop(self.image).to('RGB')]
+            return [self.crop().to('RGB')]
         elif mode == 'cascade':
             center = tuple(int, int)(self.center())
             box = self.bbox
@@ -118,6 +121,6 @@ if __name__ == '__main__':
     def test_number_render():
         image, _ = get_task_data('42_2')
         ve = VE(image)
-        ve.sam().present('number').display()
+        assert isinstance(ve.sam().present('number')[0], Image.Image)
     
     test_number_render()

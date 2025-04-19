@@ -1,7 +1,7 @@
 from action_node import operators
 from sample.crop_seg.graph import Graph
 from zero import get_task_data
-from db import VE
+from ve import VE
 import asyncio
 
 if __name__ == "__main__":

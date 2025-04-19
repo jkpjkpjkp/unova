@@ -18,7 +18,7 @@ from json import JSONDecodeError
 from json.decoder import _decode_uXXXX
 import asyncio
 from PIL import Image
-from db import VE
+from ve import VE
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -36,10 +36,15 @@ class LLM:
         if images:
 
             def to_base64(image: Image.Image):
+                if isinstance(image, VE):
+                    image = image.present()
+                    print(type(image))
                 buffered = BytesIO()
                 image.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue())
-            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in itertools.chain(getattr(image, 'present', image) for image in images)]
+            print(images)
+            print(images[0])
+            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in sum(image.present() for image in images)]
             if isinstance(messages[1]["content"], list):
                 messages[1]["content"].extend(image_content)
             else: # Should not happen based on current structure, but good practice
