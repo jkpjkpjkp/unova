@@ -20,8 +20,10 @@ splitting method: we are using sam2 auto mask gen, and use each mask as a split.
 
 """, pydantic_model = splitaggregate, mode='xml_fill')
     
-    def aggregate(self, aggregation, subanswers):
-        return self.custom(f"""""")
+    async def aggregate(self, aggregation, subanswers):
+        subanswers_str = ', '.join(subanswers) 
+        prompt = f"Given the following answers from different parts of the image: [{subanswers_str}], please {aggregation} to get the final answer."
+        return await self.custom(prompt)
         
     
     async def run(self, question: tuple[VE, str]) -> str:
@@ -29,5 +31,5 @@ splitting method: we are using sam2 auto mask gen, and use each mask as a split.
         image = await self.crop(*question)
         sub = await self.subproblem_generation(question[1])
 
-        response = self.aggregate(sub['aggregation'], map(self.custom(sub['subquestion']), self.image.sam()))
+        response = await self.aggregate(sub['aggregation'], list(map(self.custom(sub['subquestion']), self.image.sam())))
         return response

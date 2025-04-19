@@ -27,6 +27,14 @@ class Graph(MyHash, SQLModel, table=True):
 
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
+    
+    @classmethod
+    def read(foldername):
+        with open(os.path.join(foldername, "graph.py"), "r") as f:
+            graph = f.read()
+        with open(os.path.join(foldername, "prompt.py"), "r") as f:
+            prompt = f.read()
+        return Graph(graph=graph, prompt=prompt)
 
     @property
     def run(self):
@@ -64,8 +72,41 @@ class Graph(MyHash, SQLModel, table=True):
                 return result, captured_locals
             return wrapper
         
-        def log_to_db_wrapper(func):
-            @functools.wraps(func)
+        #BY GROK NOT CHECKED
+        def log_to_db_wrapper(graph_id): 
+            def decorator(func):
+                @functools.wraps(func)
+                async def wrapper(task):
+                    # Execute the wrapped function (assumes it returns result, captured_locals)
+                    result, captured_locals = await func(task)
+                    
+                    # Extract task_id from the task dictionary
+                    task_id = task['question_id']
+                    
+                    # The result is the final output
+                    final_output = result
+                    
+                    # Determine correctness by comparing result with question_answer
+                    correct = (result == task['question_answer'])
+                    
+                    # Create a Run object with the run details
+                    run = Run(
+                        graph_id=graph_id,
+                        task_id=task_id,
+                        log=captured_locals,
+                        final_output=final_output,
+                        correct=correct
+                    )
+                    
+                    # Save to the database
+                    with Session(_engine) as session:
+                        session.add(run)
+                        session.commit()
+                    
+                    # Return the original result
+                    return result
+                return wrapper
+            return decorator
         
         return extract_local_variables_wrapper(graph.run)
 
