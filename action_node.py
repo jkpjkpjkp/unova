@@ -17,7 +17,8 @@ from json import JSONDecodeError
 from json.decoder import _decode_uXXXX
 import asyncio
 from PIL import Image
-from ve import VE
+from pydantic import BaseModel, Field, BeforeValidator
+from typing_extensions import Annotated
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -1355,10 +1356,17 @@ class ActionNode:
 class GenerateOp(BaseModel):
     response: str = Field(default="", description="Your solution for this problem")
 
+def parse_bbox_string(v: str) -> Tuple[int, int, int, int]:
+    match = re.search(r'<bbox>(\d+)\s+(\d+)\s+(\d+)\s+(\d+)</bbox>', v)
+    if not match:
+        raise ValueError("Invalid bbox format; expected '<bbox>num num num num</bbox>'")
+    return tuple(int(x) for x in match.groups())
+
+BBoxType = Annotated[Tuple[int, int, int, int], BeforeValidator(parse_bbox_string)]
 
 class CropOp(BaseModel):
     thought: str = Field(default="", description="Thoughts on what crop may be sufficient.")
-    bbox: tuple[int, int, int, int] = Field(default=[], description="a crop containing all relevant information, in x y x y format, idx from 0 to 1000")
+    bbox: BBoxType = Field(..., description="a crop containing all relevant information, in x y x y format, idx from 0 to 1000")
 
 
 def custom(input, model='gemini-2.0-flash', dna=GenerateOp):

@@ -4,6 +4,9 @@ from sqlalchemy.types import JSON
 from typing import Dict, Any
 import hashlib
 import os
+import sys
+import functools
+from action_node import operators
 
 db_name = "runs.db"
 
@@ -25,6 +28,52 @@ class Graph(MyHash, SQLModel, table=True):
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
 
+    @property
+    def run(self):
+        graph_code = self.graph + '\n' + self.prompt
+        namespace = {}
+        namespace['__name__'] = '__exec__'
+        namespace['__package__'] = None
+        
+        if graph_code.endswith('"""'):
+            pass
+        elif graph_code.endswith('""'):
+            graph_code += '"'
+        
+        try:
+            exec(graph_code, namespace)
+        except Exception:
+            print("--- Executing graph code ---")
+            print(graph_code)
+            print("--- End graph code ---")
+            raise
+        Graph = namespace.get("Graph")
+        graph = Graph(operators=operators, prompt_custom=namespace)
+
+        def extract_local_variables(func):
+            @functools.wraps(func)
+            async def wrapper(*args, **kwargs):
+                original = sys.gettrace()
+                captured_locals = {}
+                def trace(frame, event, _arg):
+                    if event == 'return' and frame.f_code is func.__code__:
+                        nonlocal captured_locals
+                        captured_locals = frame.f_locals
+                    return trace
+                sys.settrace(trace)
+                try:
+                    result = await func(*args, **kwargs)
+                except:
+                    sys.settrace(original)
+                    raise
+                sys.settrace(original)
+                captured_locals = dict(captured_locals)
+                captured_locals.pop('self')
+                return result, captured_locals
+            return wrapper
+        return extract_local_variables(graph.run)
+
+
 
 class Run(MyHash, SQLModel, table=True):
     graph_id: int = Field(primary_key=True, foreign_key="graph.id")
@@ -38,6 +87,26 @@ class Run(MyHash, SQLModel, table=True):
 
 _engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(_engine)
+
+import polars as pl
+from PIL import Image
+import io
+
+df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
+tasks = df['question_id'].to_list()
+
+def get_high_variation_task(k=1):
+    ret = []
+    with Session(_engine) as session:
+        run_task_ids = session.exec(select(Run.task_id)).all()
+        for task_id in tasks:
+            if task_id not in run_task_ids:
+                ret.append(task_id)
+    if len(ret) >= k:
+        return ret[:k]
+    with Session(_engine) as session:
+        ret.extend(session.exec(select(Run.task_id).group_by(Run.task_id).order_by(func.std(Run.correct).desc()).limit(k - len(ret))).all())
+    return ret
 
 def put(x):
     if isinstance(x, Graph):
