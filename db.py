@@ -574,21 +574,7 @@ def depth_estimator(image):
 
     return depth_array
 
-def sam2(image):
-    client = Client("http://localhost:7861/")
-    if not isinstance(image, Image.Image):
-        raise ValueError("image must be a PIL Image")
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-        image.save(temp_file.name)
-        image_path = temp_file.name
-    try:
-        result = client.predict(
-                input_image=handle_file(image_path),
-                api_name="/predict"
-        )
-    finally:
-        os.remove(image_path)
-    return np.array([np.array(Image.open(x['image'])) for x in result])
+
 
 
 async def callopenai(x: str, model='gemini-2.0-flash',tools: list[Literal['crop']]=[]):

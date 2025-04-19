@@ -18,6 +18,7 @@ from json import JSONDecodeError
 from json.decoder import _decode_uXXXX
 import asyncio
 from PIL import Image
+from db import VE
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -1396,8 +1397,8 @@ class Operator:
         return node.instruct_content.model_dump()
 
 class Custom(Operator):
-    def __init__(self, llm: LLM, name: str = "Custom"):
-        super().__init__(llm, name)
+    def __init__(self, llm: LLM = None, name: str = "Custom"):
+        super().__init__(llm or LLM(), name)
 
     async def __call__(self, input, pydantic_model=GenerateOp, mode: Literal["single_fill", "xml_fill", "code_fill"] = "single_fill"):
         prompt = input
@@ -1419,6 +1420,31 @@ class Crop(Operator):
 
 def test_crop():
     crop = Crop()()
+
+def _sam2(image):
+    client = Client("http://localhost:7861/")
+    if not isinstance(image, Image.Image):
+        raise ValueError("image must be a PIL Image")
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        image.save(temp_file.name)
+        image_path = temp_file.name
+    try:
+        result = client.predict(
+            input_image=handle_file(image_path),
+            api_name="/predict"
+        )
+    finally:
+        os.remove(image_path)
+    return np.array([np.array(Image.open(x['image'])) for x in result])
+
+def sam2(image: VE) -> VE
+    return VE(_sam2(image.image))
+
+operators = {
+    'Custom': Custom(),
+    'Crop': Crop(),
+    'SAM2': sam2,
+}
 
 if __name__ == '__main__':
     print(asyncio.run(Custom(LLM())('hi! ')))
