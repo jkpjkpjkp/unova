@@ -5,9 +5,12 @@ import numpy as np
 import json
 import os
 from collections import defaultdict
-
+import random
 from loguru import logger
 import itertools
+from pydantic import BaseModel
+
+from aflow_prompt import *
 
 max_rounds = 25
 
@@ -53,16 +56,23 @@ async def experiment(
     graph = graphs[np.random.choice(len(graphs), p=compute_probabilities(score))]
     return graph
 
+
+
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 for round in range(max_rounds):
-    graph = experiment()
-    runs = graph.runs.filter(Run.correct == False)
+    graph: Graph = experiment()
+    runs = filter(lambda x: not x.correct, graph.runs)
+    run = random.choice(runs)
+    avoid = [x.change for x in graph.children]
+
     
     store graph as file, use traditional aflow touch.
-    father is known by 
+
 
     gather experience, log, 
     and make modification.
 
     sam result will cause massive vlm call, should only SoM and crop. this also make present() Image only. 
+
+    log contain thumbnail of original task image only

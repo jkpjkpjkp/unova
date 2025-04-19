@@ -24,14 +24,13 @@ class Graph(MyHash, SQLModel, table=True):
     id: int = Field(primary_key=True)
     graph: str
     prompt: str
-    father: int | None = Field(default=None, foreign_key="graph.id")
+    father: 'Graph' | None = Relationship(backpopulates="children")
     change: str | None = Field(default=None)
+    children: list['Graph'] = Relationship(backpopulates="father")
 
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
 
-    
-    
     @classmethod
     def read(foldername):
         with open(os.path.join(foldername, "graph.py"), "r") as f:
@@ -76,38 +75,28 @@ class Graph(MyHash, SQLModel, table=True):
                 return result, captured_locals
             return wrapper
         
-        #BY GROK NOT CHECKED
         def log_to_db_wrapper(graph_id): 
             def decorator(func):
                 @functools.wraps(func)
                 async def wrapper(task):
-                    # Execute the wrapped function (assumes it returns result, captured_locals)
+                    answer = task.pop('question_answer')
                     result, captured_locals = await func(task)
-                    
-                    # Extract task_id from the task dictionary
+                    task['question_id'] = answer
                     task_id = task['question_id']
-                    
-                    # The result is the final output
-                    final_output = result
-                    
-                    # Determine correctness by comparing result with question_answer
                     correct = (result == task['question_answer'])
                     
-                    # Create a Run object with the run details
                     run = Run(
                         graph_id=graph_id,
                         task_id=task_id,
                         log=captured_locals,
-                        final_output=final_output,
+                        final_output=result,
                         correct=correct
                     )
                     
-                    # Save to the database
                     with Session(_engine) as session:
                         session.add(run)
                         session.commit()
                     
-                    # Return the original result
                     return result
                 return wrapper
             return decorator
