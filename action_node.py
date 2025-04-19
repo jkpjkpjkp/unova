@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, create_model, model_validator
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from openai import OpenAI
 from loguru import logger
-import itertools
 import base64
 from io import BytesIO
 import copy
@@ -36,15 +35,10 @@ class LLM:
         if images:
 
             def to_base64(image: Image.Image):
-                if isinstance(image, VE):
-                    image = image.present()
-                    print(type(image))
                 buffered = BytesIO()
                 image.save(buffered, format="JPEG")
-                img_str = base64.b64encode(buffered.getvalue())
-            print(images)
-            print(images[0])
-            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in sum(image.present() for image in images)]
+                return base64.b64encode(buffered.getvalue())
+            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in sum((image.present() for image in images), start=[])]
             if isinstance(messages[1]["content"], list):
                 messages[1]["content"].extend(image_content)
             else: # Should not happen based on current structure, but good practice
@@ -53,6 +47,7 @@ class LLM:
         return self.client.chat.completions.create(
             model=self.model,
             messages=messages,
+            temperature=0,
         ).choices[0].message.content
 
 
@@ -1431,29 +1426,9 @@ class Crop(Operator):
 def test_crop():
     crop = Crop()()
 
-def _sam2(image):
-    client = Client("http://localhost:7861/")
-    if not isinstance(image, Image.Image):
-        raise ValueError("image must be a PIL Image")
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-        image.save(temp_file.name)
-        image_path = temp_file.name
-    try:
-        result = client.predict(
-            input_image=handle_file(image_path),
-            api_name="/predict"
-        )
-    finally:
-        os.remove(image_path)
-    return np.array([np.array(Image.open(x['image'])) for x in result])
-
-def sam2(image: VE) -> VE:
-    return VE(_sam2(image.image))
-
 operators = {
     'Custom': Custom(),
     'Crop': Crop(),
-    'SAM2': sam2,
 }
 
 if __name__ == '__main__':

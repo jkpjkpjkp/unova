@@ -1,4 +1,4 @@
-from typing import Self, Iterator
+from typing import Iterator
 from PIL import Image
 import functools
 import numpy as np
@@ -24,8 +24,6 @@ def sam2(image):
                 input_image=handle_file(image),
                 api_name="/predict"
         )
-    print(result)
-    print(result[0])
     return np.array([np.array(Image.open(x['image'])) for x in result])
 
 def sam2_imagecrop(image):
@@ -41,22 +39,22 @@ def sam2_imagecrop(image):
 class VisualEntity:
     _img: Image.Image | list['VisualEntity']
 
-    def __init__(self, img: Image.Image | list[Self]):
+    def __init__(self, img: Image.Image | list['VisualEntity']):
         self._img = img
-    def __iter__(self) -> Iterator[Self]:
+    def __iter__(self) -> Iterator['VisualEntity']:
         if isinstance(self._img, Image.Image):
             yield self
         else:
             return iter(self._img)
     def __len__(self):
         return len(self._img) if isinstance(self._img, list) else 1
-    def __getitem__(self, item) -> Self:
+    def __getitem__(self, item) -> 'VisualEntity':
         if isinstance(self._img, Image.Image):
             assert item == 0
             return self
         else:
             return self._img[item]
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: 'VisualEntity') -> 'VisualEntity':
         l = self._img if isinstance(self._img, list) else [self]
         r = other._img if isinstance(other._img, list) else [other]
         return VisualEntity(l + r)
@@ -74,7 +72,7 @@ class VisualEntity:
     
     def crop(self, xyxy: tuple[int, int, int, int] | None = None):
         assert isinstance(self._img, Image.Image)
-        return Self(self._img.crop(xyxy or self.bbox))
+        return self._img.crop(xyxy or self.bbox)
     def crop1000(self, box: tuple):
         x, y = self.shape
         return self.crop(box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y)

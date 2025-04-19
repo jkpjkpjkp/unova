@@ -1,4 +1,6 @@
 import polars as pl
+from PIL import Image
+import io
 
 df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
 
@@ -23,9 +25,6 @@ if __name__ == "__main__":
 # holy_grail = pl.read_ndjson('/mnt/home/jkp/hack/tmp/MetaGPT/counting_zero.jsonl')
 
 # print(holy_grail.head())
-from PIL import Image
-import io
-import polars as pl
 
 def get_task_data(task_id):
     filtered_df = df.filter(pl.col('question_id') == task_id)

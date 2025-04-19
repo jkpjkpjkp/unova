@@ -5,7 +5,6 @@ class Graph:
     def __init__(self, operators: dict):
         self.custom = operators['Custom']
         self.crop = operators['Crop']
-        self.sam = operators['SAM2']
     
     def subproblem_generation(self, question) -> str:
         class splitaggregate(BaseModel):
@@ -21,5 +20,5 @@ class Graph:
         image = question[0]
         image = await self.crop(*question)
         subquestion, aggregation = self.subproblem_generation(question[1])
-        response = self.aggregate(aggregation, map(self.custom(subquestion), self.sam(image)))
+        response = self.aggregate(aggregation, map(self.custom(subquestion), self.image.sam()))
         return response

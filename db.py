@@ -4,10 +4,6 @@ from sqlalchemy.types import JSON
 from typing import Dict, Any
 import hashlib
 import os
-from PIL import Image
-import numpy as np
-from gradio_client import Client, handle_file
-import tempfile
 
 db_name = "runs.db"
 
