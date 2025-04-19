@@ -32,7 +32,6 @@ class LLM:
             {"role": "system", "content": system_msgs or "You are a helpful assistant."},
             {"role": "user", "content": [{"type": "text", "text": prompt}]}
         ]
-        # Only add image content if images list is not empty
         if images:
 
             def to_base64(image: Image.Image):
@@ -1128,7 +1127,6 @@ class ActionNode:
     async def simple_fill(
         self, schema, mode, images: Optional[Union[str, list[str]]] = None, timeout=10, exclude=None
     ):
-        print(context)
         prompt = self.compile(context=self.context, schema=schema, mode=mode, exclude=exclude)
         if schema != "raw":
             mapping = self.get_mapping(mode, exclude=exclude)
@@ -1280,24 +1278,18 @@ class ActionNode:
         :param exclude: The keys of ActionNode to exclude.
         :return: self
         """
+        
+        if isinstance(context, tuple):
+            from ve import VE
+            for x in context:
+                assert isinstance(x, str) or isinstance(x, VE)
+            images.extend([x for x in context if isinstance(x, VE)])
+            context = '\n'.join(x for x in context if isinstance(x, str))
+
         self.set_llm(llm)
         self.set_context(context)
         if self.schema:
             schema = self.schema
-        
-        if isinstance(context, tuple):
-            for x in context:
-                assert isinstance(x, str) or isinstance(x, Image.Image)
-            images.extend([x for x in context if isinstance(x, Image.Image)])
-            context = '\n'.join(x for x in context if isinstance(x, str))
-
-        def to_base64(image: Image.Image):
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG")
-            return base64.b64encode(buffered.getvalue())
-        if isinstance(images, list):
-            images = [to_base64(x) if isinstance(x, Image.Image) else x for x in images]
-        
 
         elif mode == FillMode.XML_FILL.value:
             context = self.xml_compile(context=self.context)

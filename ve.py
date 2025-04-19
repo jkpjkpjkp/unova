@@ -40,7 +40,10 @@ class VisualEntity:
     _img: Image.Image | list['VisualEntity']
 
     def __init__(self, img: Image.Image | list['VisualEntity']):
-        self._img = img
+        if isinstance(img, VE):
+            self = img
+        else:
+            self._img = img
     def __iter__(self) -> Iterator['VisualEntity']:
         if isinstance(self._img, Image.Image):
             yield self
@@ -75,7 +78,7 @@ class VisualEntity:
         return self._img.crop(xyxy or self.bbox)
     def crop1000(self, box: tuple):
         x, y = self.shape
-        return self.crop((box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y))
+        return VE(self.crop((box[0] / 1000 * x, box[1] / 1000 * y, box[2] / 1000 * x, box[3] / 1000 * y)))
     
     @property
     def image(self):
