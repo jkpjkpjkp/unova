@@ -94,4 +94,5 @@ class ExperienceUtils:
         experience["after"] = avg_score
         experience["succeed"] = bool(avg_score > experience["before"])
 
-        write_json_file(os.path.join(directory, "experience.json"), experience, encoding="utf-8", indent=4)
+        with open(os.path.join(directory, "experience.json"), encoding="utf-8"):
+            json.dump(experience, indent=4)

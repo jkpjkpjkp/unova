@@ -24,9 +24,13 @@ class Graph(MyHash, SQLModel, table=True):
     id: int = Field(primary_key=True)
     graph: str
     prompt: str
+    father: int | None = Field(default=None, foreign_key="graph.id")
+    change: str | None = Field(default=None)
 
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
+
+    
     
     @classmethod
     def read(foldername):

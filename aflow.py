@@ -9,12 +9,11 @@ from collections import defaultdict
 from loguru import logger
 import itertools
 
+max_rounds = 25
+
 def compute_probabilities(self, scores, alpha=0.2, lambda_=0.3):
     scores = np.array(scores, dtype=np.float64)
     n = len(scores)
-
-    if n == 0:
-        raise ValueError("Score list is empty.")
 
     uniform_prob = np.full(n, 1.0 / n, dtype=np.float64)
 
@@ -36,11 +35,15 @@ def compute_probabilities(self, scores, alpha=0.2, lambda_=0.3):
 
     return mixed_prob
 
-async def experiment():
-    tasks = get_high_variation_task(7)
-    graphs = get_strongest_graph(7)
+async def experiment(
+    num_graph=7,
+    num_task=14,
+) -> Graph:
+    # selecting highest variation is self-stabilizing (good). 
+    tasks = get_high_variation_task(num_task)
+    graphs = get_strongest_graph(num_graph)
 
-    run = [[None for _ in range(7)] for _ in range(7)]
+    run = [[None for _ in range(num_task)] for _ in range(num_graph)]
     for i, graph in enumerate(graphs):
         for j, task_id in enumerate(tasks):
             run[i, j] = graph.run(get_task_data(task_id))
@@ -48,4 +51,18 @@ async def experiment():
     res = [[await x for x in y] for y in run]
     score = [sum(x[1] for x in y) / len(y) for y in res]
     graph = graphs[np.random.choice(len(graphs), p=compute_probabilities(score))]
+    return graph
 
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+for round in range(max_rounds):
+    graph = experiment()
+    runs = graph.runs.filter(Run.correct == False)
+    
+    store graph as file, use traditional aflow touch.
+    father is known by 
+
+    gather experience, log, 
+    and make modification.
+
+    sam result will cause massive vlm call, should only SoM and crop. this also make present() Image only. 

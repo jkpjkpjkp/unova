@@ -44,9 +44,6 @@ class DataUtils:
         return unique_top_scores
 
     def select_round(self, items):
-        if not items:
-            raise ValueError("Item list is empty.")
-
         sorted_items = sorted(items, key=lambda x: x["score"], reverse=True)
         scores = [item["score"] * 100 for item in sorted_items]
 
@@ -62,9 +59,7 @@ class DataUtils:
     def _compute_probabilities(self, scores, alpha=0.2, lambda_=0.3):
         scores = np.array(scores, dtype=np.float64)
         n = len(scores)
-
-        if n == 0:
-            raise ValueError("Score list is empty.")
+        assert n, "Score list is empty."
 
         uniform_prob = np.full(n, 1.0 / n, dtype=np.float64)
 
@@ -101,7 +96,7 @@ class DataUtils:
 
         if not os.path.exists(log_dir):
             logger.warning(f"No log_dir found for round {cur_round}")
-            return MM()
+            return ""
         
         logger.info(log_dir)
         data = read_json_file(log_dir, encoding="utf-8")
