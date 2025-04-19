@@ -1293,6 +1293,7 @@ class ActionNode:
         elif mode == FillMode.XML_FILL.value:
             context = self.xml_compile(context=self.context)
             result = await self.xml_fill(context, images=images)
+            print(result)
             self.instruct_content = self.create_class()(**result)
             return self
 
