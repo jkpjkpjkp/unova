@@ -31,5 +31,5 @@ splitting method: we are using sam2 auto mask gen, and use each mask as a split.
         image = await self.crop(*question)
         sub = await self.subproblem_generation(question[1])
 
-        response = await self.aggregate(sub['aggregation'], list(map(self.custom(sub['subquestion']), self.image.sam())))
+        response = await self.aggregate(sub['aggregation'], list(map(self.custom(sub['subquestion']), image.sam())))
         return response
