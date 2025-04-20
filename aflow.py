@@ -69,15 +69,20 @@ def format_experience(graph):
     experience += "\n\nNote: Take into account past failures and avoid repeating the same mistakes, as these failures indicate that these approaches are ineffective. You must fundamentally change your way of thinking, rather than simply using more advanced Python syntax like for, if, else, etc., or modifying the prompt."
     return experience
 
+def format_operator_description(operators):
+    return '\n'.join(OPERATOR_DESCRIPTION.format(id=i, name=op.name, description=op.description, interface=op.interface) for i, op in enumerate(operators))
 
-def load_log(data):
+def format_log(data):
     sample_size = min(3, len(data))
     log = ""
     for sample in random.sample(data, k=sample_size):
         log += json.dumps(sample, indent=4, ensure_ascii=False) + "\n\n"
-        log += "-" * 40 + "\n\n"
     return log
 
+class GraphOp(BaseModel):
+    modification: str = Field(default="", description="modification")
+    graph: str = Field(default="", description="graph")
+    prompt: str = Field(default="", description="prompt")
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -90,13 +95,15 @@ for round in range(max_rounds):
         score = graph.score,
         graph = graph.graph,
         prompt = graph.prompt,
-        operator_description = OPERATOR_DESCRIPTION,
-        log=load_log(runs)
+        operator_description = format_operator_description(operators),
+        log=format_log(runs)
     )
     
-
-    gather experience, log, 
-    and make modification.
+    ActionNode.from_pydantic(GraphOp).fill(
+        context=prompt,
+        llm=LLM(model='gemini-2.5-pro-exp-03-25'),
+        mode="xml_fill",
+    )
 
     sam result will cause massive vlm call, should only SoM and crop. this also make present() Image only. 
 
