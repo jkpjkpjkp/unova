@@ -71,60 +71,11 @@ def format_experience(graph):
 
 
 def load_log(data):
-    final_outputs = [item for item in data if not item.get("is_intermediate", False)]
-    intermediate_results = [item for item in data if item.get("is_intermediate", False)]
-    
-    # Group intermediate results by question
-    question_to_steps = {}
-    for item in intermediate_results:
-        question_text = item["question"]["text"] if isinstance(item["question"], dict) else str(item["question"])
-        if question_text not in question_to_steps:
-            question_to_steps[question_text] = []
-        question_to_steps[question_text].append(item)
-    
-    # Prioritize questions with intermediate steps
-    questions_with_steps = list(question_to_steps.keys())
-    
-    # Select a few final outputs to show
-    sample_size = min(3, len(final_outputs))
-    random_samples = []
-    
-    # First include examples with intermediate steps
-    final_with_steps = [
-        item for item in final_outputs 
-        if isinstance(item["question"], dict) and item["question"]["text"] in questions_with_steps
-    ]
-    
-    if final_with_steps:
-        selected_with_steps = random.sample(final_with_steps, min(2, len(final_with_steps)))
-        random_samples.extend(selected_with_steps)
-    
-    # Add more random samples if needed
-    remaining_samples_needed = max(0, sample_size - len(random_samples))
-    if remaining_samples_needed > 0 and len(final_outputs) > len(random_samples):
-        remaining_outputs = [item for item in final_outputs if item not in random_samples]
-        random_samples.extend(random.sample(remaining_outputs, min(remaining_samples_needed, len(remaining_outputs))))
-
-    # Format the log with final outputs and their intermediate steps
+    sample_size = min(3, len(data))
     log = ""
-    for sample in random_samples:
-        # First add the final output
-        log += "Final Result:\n"
+    for sample in random.sample(data, k=sample_size):
         log += json.dumps(sample, indent=4, ensure_ascii=False) + "\n\n"
-        
-        # Then add any intermediate steps
-        question_text = sample["question"]["text"] if isinstance(sample["question"], dict) else str(sample["question"])
-        if question_text in question_to_steps:
-            log += "Intermediate Steps:\n"
-            steps = question_to_steps[question_text]
-            steps.sort(key=lambda x: x.get("timestamp", ""))
-            
-            for step in steps:
-                log += f"Step: {step.get('step_name', 'Unknown')}\n"
-                log += json.dumps(step, indent=4, ensure_ascii=False) + "\n\n"
-            
-            log += "-" * 40 + "\n\n"
-
+        log += "-" * 40 + "\n\n"
     return log
 
 

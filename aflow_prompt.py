@@ -46,3 +46,5 @@ Note: In custom, the input and instruction are directly concatenated(instruction
 
 **Introducing multiple operators at appropriate points can enhance performance. If you find that some provided operators are not yet used in the graph, try incorporating them.**
 """
+
+OPERATOR_DESCRIPTION = "{id}. {name}: {description}, with interface {interface} \n"
