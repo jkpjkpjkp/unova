@@ -11,7 +11,7 @@ class Graph:
     def info_spread(self, mask: Image.Image, question: str):
         self.custom(self.prompts['INFO_SPREAD'].format(image=mask, question=question))
     
-    def info_gather(self, info: list[str]):
+    def info_gather(self, info: list[str], som_image):
         self.custom(self.prompts['INFO_GATHER'].format(parts='\n'.join(info)))
 
     async def run(self, question: tuple[Image.Image, str]) -> str:
@@ -19,5 +19,5 @@ class Graph:
         sam = self.sam(image)
         som = self.som(sam)
         info = map(self.info_spread, sam, question[1])
-        response = await self.info_gather(info)
+        response = await self.info_gather(info, som)
         return response

@@ -39,7 +39,7 @@ class LLM:
                 buffered = BytesIO()
                 image.save(buffered, format="JPEG")
                 return base64.b64encode(buffered.getvalue())
-            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in sum((image.present() for image in images), start=[])]
+            image_content = [{"type": "image_url", "image_url": {"url": to_base64(img).decode()}} for img in images]
             if isinstance(messages[1]["content"], list):
                 messages[1]["content"].extend(image_content)
             else: # Should not happen based on current structure, but good practice
@@ -1430,7 +1430,7 @@ class Crop(Operator):
         super().__init__(llm or LLM(), name)
     
     async def __call__(self, image, question):
-        response = await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=image,mode='xml_fill')
+        response = await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=[image],mode='xml_fill')
         bbox = response['bbox']
         ret = image.crop1000(bbox)
         uid = uuid.uuid4()

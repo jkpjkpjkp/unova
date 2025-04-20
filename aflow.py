@@ -3,11 +3,7 @@ import asyncio
 from zero import get_task_data
 import numpy as np
 import json
-import os
-from collections import defaultdict
 import random
-from loguru import logger
-import itertools
 from pydantic import BaseModel
 
 from aflow_prompt import *
@@ -74,7 +70,6 @@ def format_operator_description(operators):
     return '\n'.join(OPERATOR_DESCRIPTION.format(id=i, name=op.name, description=op.description, interface=op.interface) for i, op in enumerate(operators))
 
 def format_log(data):
-    sample_size = min(3, len(data))
     log = ""
     for sample in data:
         log += json.dumps(sample, indent=4, ensure_ascii=False) + "\n\n"
