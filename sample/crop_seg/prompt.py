@@ -29,3 +29,10 @@ let's think step by step and give the final answer in curly braces like this: {{
 """
 
 COT = "\n\n\nLet’s think step by step and give the final answer in curly braces, like this: {{final_answer}}"
+
+prompt_dict = {
+    'BBOX': BBOX,
+    'INFO_SPREAD': INFO_SPREAD,
+    'INFO_GATHER': INFO_GATHER,
+    'COT': COT,
+}
