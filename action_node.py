@@ -707,7 +707,6 @@ def repair_escape_error(commands):
     When RoleZero parses a command, the command may contain unknown escape characters.
 
     This function has two steps:
-    1. Transform unescaped substrings like "\\d" and "\(" to "\\\\d" and "\\\\(".
     2. Transform escaped characters like '\f' to substrings like "\\\\f".
 
     Example:
@@ -1450,21 +1449,41 @@ import numpy as np
 from PIL import Image
 from som import inference_sam_m2m_auto
 import functools
+from gradio_client import Client
+import requests
+import os
 
-def call_mask_api(image: Image.Image, api_url: str = "http://localhost:7861/api/predict"):
-    image.convert('RGB')
-    img_byte_arr = io.BytesIO()
-    image.save(img_byte_arr, format='PNG')
-    img_byte_arr.seek(0)
+def call_mask_api(image):
+    server_url = "http://localhost:7861"
+    client = Client(server_url)
+    filename = client.predict(image=image, api_name="/predict")
+
+    download_url = f"{server_url}/file={filename}"
+
+    response = requests.get(download_url)
+    assert response.status_code == 200, f"Failed to download the file. Status code: {response.status_code}"
     
-    response = requests.post(api_url, files={"data": img_byte_arr})
-    assert response.status_code == 200, f"API request failed with status code {response.status_code}: {response.text}"
+    with open(filename, "wb") as f:
+        f.write(response.content)
+    print(f"File downloaded successfully: {filename}")
     
-    masks = response.json()
+    data = np.load(filename)
+    segmentations = data['segmentations']
+    areas = data['areas']
+    bboxes = data['bboxes']
+    predicted_ious = data['predicted_ious']
     
-    for mask in masks:
-        mask['segmentation'] = np.array(mask['segmentation'])
-    
+    num_masks = segmentations.shape[0]
+    masks = []
+    for i in range(num_masks):
+        mask = {
+            'segmentation': segmentations[i],
+            'area': areas[i],
+            'bbox': bboxes[i],
+            'predicted_iou': predicted_ious[i]
+        }
+        masks.append(mask)
+    print(f"Reconstructed {len(masks)} masks")
     return masks
 
 

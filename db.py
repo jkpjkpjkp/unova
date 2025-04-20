@@ -1,7 +1,7 @@
 from sqlmodel import Field, Relationship, SQLModel, create_engine, Session, select
 from sqlalchemy import Column, func
 from sqlalchemy.types import JSON
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import hashlib
 import os
 import sys
@@ -48,12 +48,25 @@ class Graph(MyHash, SQLModel, table=True):
     id: int = Field(primary_key=True)
     graph: str
     prompt: str
-    father: 'Graph' | None = Relationship(backpopulates="children")
-    change: str | None = Field(default=None)
-    children: list['Graph'] = Relationship(backpopulates="father")
+    father_id: Optional[int] = Field(default=NotImplemented)
+    children_id: list[int] = Field(default=[], sa_column=Column(JSON))
+    change: Optional[str] = Field(default=None)
 
     runs: list["Run"] = Relationship(back_populates="graph")
     _hash_fields = ('graph', 'prompt')
+
+    @property
+    def father(self):
+        if not self.father_id:
+            return None
+        with Session(engine) as session:
+            return session.get(Graph, self.father_id)
+    
+    @property
+    def children(self):
+        with Session(engine) as session:
+            return [session.get(Graph, id) for id in self.children_id]
+
 
     @classmethod
     def read(foldername):
@@ -129,7 +142,7 @@ class Graph(MyHash, SQLModel, table=True):
                 return wrapper
             return decorator
         
-        return extract_local_variables_wrapper(graph.run)
+        return log_to_db_wrapper(extract_local_variables_wrapper(graph.run))
 
 
 class Run(MyHash, SQLModel, table=True):
@@ -142,7 +155,7 @@ class Run(MyHash, SQLModel, table=True):
     graph: Graph = Relationship(back_populates="runs")
     _hash_fields = ('graph_id', 'task_id', 'log')
 
-    @propertyw
+    @property
     def task(self):
         from zero import get_task_data
         return get_task_data(self.task_id)

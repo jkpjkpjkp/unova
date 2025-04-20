@@ -80,10 +80,8 @@ class GraphOp(BaseModel):
     graph: str = Field(default="", description="graph")
     prompt: str = Field(default="", description="prompt")
 
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
 for round in range(max_rounds):
-    graph: Graph = experiment()
+    graph: Graph = asyncio.run(experiment())
     runs = filter(lambda x: not x.correct, graph.runs)
     runs = random.sample(runs, min(3, len(runs)))
     run_imgs = [run.task[0].thumbnail(764, 764) for run in runs]
