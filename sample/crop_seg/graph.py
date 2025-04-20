@@ -12,7 +12,7 @@ class Graph:
         self.custom(self.prompts['INFO_SPREAD'].format(image=mask, question=question))
     
     def info_gather(self, info: list[str], som_image):
-        self.custom(self.prompts['INFO_GATHER'].format(parts='\n'.join(info)))
+        self.custom(self.prompts['INFO_GATHER'].format(parts='\n'.join(info), SoM_image=som_image))
 
     async def run(self, question: tuple[Image.Image, str]) -> str:
         # image = await self.crop(*question)

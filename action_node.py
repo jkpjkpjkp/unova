@@ -1484,14 +1484,28 @@ def test_api():
     print(type(ret))
     print(len(ret))
 
-if __name__ == '__main__':
-    test_api()
-
 def image_mask_to_alpha(image, mask):
     masked = image.copy()
-    alpha_mask = Image.fromarray(mask['segmentation'] * 255, mode='L')  # size becomes (width, height)
+    alpha_mask = Image.fromarray(mask['segmentation'].astype('uint8') * 255, mode='L')  # size becomes (width, height)
+    print(mask['segmentation'] * 255)
+    alpha_mask.show()
+    # assert alpha_mask.getpixel((np.where(mask['segmentation'])[1][0], np.where(mask['segmentation'])[0][0])) == 255, alpha_mask.getpixel((np.where(mask['segmentation'])[1][0], np.where(mask['segmentation'])[0][0]))
     masked.putalpha(alpha_mask)
+    assert masked.getbbox()
     return masked
+
+def test_image_mask_to_alpha():
+    image = Image.new('RGB', (10, 20), (1, 2, 3))
+    mask = {'segmentation': np.concatenate([
+        np.ones((12, 10)),
+        np.zeros((8, 10))]),
+        'bbox': (0, 0, 10, 12),
+        'area': 120,
+    }
+    print(mask['segmentation'].shape)
+    ret = image_mask_to_alpha(image, mask)
+    assert area(ret) == 120
+    assert ret.getbbox() == (0, 0, 10, 12)
 
 def area(image) -> int:
     if isinstance(image, Image.Image):
@@ -1500,19 +1514,36 @@ def area(image) -> int:
     assert a % 255 == 0
     return a // 255
 
+if __name__ == '__main__':
+    test_image_mask_to_alpha()
+
 def alpha_to_mask(image):
     alpha_data = image.getdata(band=3)
     alpha_array = np.array(alpha_data).reshape((image.height, image.width))  # Reshape to (height, width)
+    xyxy = image.getbbox()
+    if not xyxy:
+        return None
+    xywh = (xyxy[0], xyxy[1], xyxy[2] - xyxy[0], xyxy[3] - xyxy[1])
     return {
         'segmentation': alpha_array // 255,
-        'bbox': image.getbbox(),
+        'bbox': xywh,
         'area': area(image),
     }
+
+def test_alpha_to_mask():
+    image = Image.new('RGBA', (100, 200), (0, 0, 0, 255))
+    mask = alpha_to_mask(image)
+    assert mask['segmentation'].shape == (200, 100)
+    assert mask['segmentation'][0, 0] == 1
+    assert mask['area'] == 20000
+    assert mask['bbox'] == (0, 0, 100, 200)
+    assert area(image) == 20000
 
 def sam_operator(image):
     ret = call_mask_api(image)
     sorted_anns = sorted(ret, key=(lambda x: x['area']), reverse=True)
     sorted_anns = sorted_anns[:10]
+    assert sorted_anns[-1]['area'] > 4
     mask_neg = image.copy().convert('RGBA')
     
     # Compute the union of all masks
@@ -1545,7 +1576,7 @@ def sam2_alpha(image):
 def set_of_mask(image):
     if isinstance(image, list):
         assert isinstance(image[0], Image.Image)
-        ret = list(map(alpha_to_mask, image))  # Convert map to list
+        ret = list(map(alpha_to_mask, image))
         image = combine(image)
     elif isinstance(image, Image.Image):
         ret = call_mask_api(image)

@@ -111,11 +111,14 @@ class Graph(SQLModel, table=True):
                 async def wrapper(task):
                     result, captured_locals = await func((task['image'], task['question']))
                     correct = (result == task['question_answer'])
+
+                    def patch_keep_only_str(d: dict):
+                        return {k: v for k, v in d.items() if isinstance(v, str)}
                     
                     run = Run(
                         graph_id=graph_id,
                         task_id=task['question_id'],
-                        log=captured_locals,
+                        log=patch_keep_only_str(captured_locals), # TODO: FIXME: this contain image, and sqlalchemy complains. we can remove them, or turn them into binary, or into uuit file
                         final_output=result,
                         correct=correct
                     )
