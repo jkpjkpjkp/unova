@@ -7,12 +7,26 @@ question: {question}
 crop the area related to the question in curly braces like this: {{x1, y1, x2, y2}}, e.g. {{0, 0, 1000, 1000}}. (x1, y1, x2, y2 are normalized the coordinates of the bounding box, in [0, 1000])
 """
 
-MASK_CAPTION = """You are a helpful assistant that captions masks.
-please caption the masked area. notice, only the 1st image is the object you should describe. the other images are just for context, and should not be described.
+INFO_SPREAD="""I will explain to you your current task.  we are trying to answer a vqa question “{question}”.  but instead of presenting you with the whole image, we decided to partition the image and here is only part of it {image}.  we will later aggregate responses from all parts, in which what you are about to say is one part.
 
-please think step by step, and place your final caption in curly braces like this: {your_caption}.
+So please provide concise information for ultimately answering the question, in curly braces {{helpful information}}. if the image part assigned to you contains no relevant information, conclude with empty curly braces {{}}. 
+
+Let's think step by step, and put the final information in curly braces like this: {{information}}
 """
 
+
+INFO_GATHER = """I will explain to you your current task.  we are trying to answer a vqa question “{question}”.  but instead of presenting you with the whole image, we have partitioned the image and present each part to one agent. Now is time to aggregate responses from all parts.
+
+Here are the responses from all agents each presented with an un-overlapping part of the image.
+
+{parts}
+
+
+please answer the original vqa question.
+
+let's think step by step, and put your final answer in curly braces lie this: {{final answer}}
+{{SoM_image}}
+"""
 
 COT = "\n\n\nLet’s think step by step and give the final answer in curly braces, like this: {{final_answer}}"
 
