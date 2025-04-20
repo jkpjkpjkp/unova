@@ -57,18 +57,92 @@ async def experiment(
     return graph
 
 
+def format_experience(graph):
+    failures = [x for x in graph.children if x.score <= graph.score]
+    successes = [x for x in graph.children if x.score > graph.score]
+    experience = f"Original Score: {graph['score']}\n"
+    experience += "These are some conclusions drawn from experience:\n\n"
+    for failure in failures:
+        experience += f"-Absolutely prohibit {failure.modification} (Score: {failure.score})\n"
+    for success in successes:
+        experience += f"-Absolutely prohibit {success.modification} \n"
+    experience += "\n\nNote: Take into account past failures and avoid repeating the same mistakes, as these failures indicate that these approaches are ineffective. You must fundamentally change your way of thinking, rather than simply using more advanced Python syntax like for, if, else, etc., or modifying the prompt."
+    return experience
+
+
+def load_log(data):
+    final_outputs = [item for item in data if not item.get("is_intermediate", False)]
+    intermediate_results = [item for item in data if item.get("is_intermediate", False)]
+    
+    # Group intermediate results by question
+    question_to_steps = {}
+    for item in intermediate_results:
+        question_text = item["question"]["text"] if isinstance(item["question"], dict) else str(item["question"])
+        if question_text not in question_to_steps:
+            question_to_steps[question_text] = []
+        question_to_steps[question_text].append(item)
+    
+    # Prioritize questions with intermediate steps
+    questions_with_steps = list(question_to_steps.keys())
+    
+    # Select a few final outputs to show
+    sample_size = min(3, len(final_outputs))
+    random_samples = []
+    
+    # First include examples with intermediate steps
+    final_with_steps = [
+        item for item in final_outputs 
+        if isinstance(item["question"], dict) and item["question"]["text"] in questions_with_steps
+    ]
+    
+    if final_with_steps:
+        selected_with_steps = random.sample(final_with_steps, min(2, len(final_with_steps)))
+        random_samples.extend(selected_with_steps)
+    
+    # Add more random samples if needed
+    remaining_samples_needed = max(0, sample_size - len(random_samples))
+    if remaining_samples_needed > 0 and len(final_outputs) > len(random_samples):
+        remaining_outputs = [item for item in final_outputs if item not in random_samples]
+        random_samples.extend(random.sample(remaining_outputs, min(remaining_samples_needed, len(remaining_outputs))))
+
+    # Format the log with final outputs and their intermediate steps
+    log = ""
+    for sample in random_samples:
+        # First add the final output
+        log += "Final Result:\n"
+        log += json.dumps(sample, indent=4, ensure_ascii=False) + "\n\n"
+        
+        # Then add any intermediate steps
+        question_text = sample["question"]["text"] if isinstance(sample["question"], dict) else str(sample["question"])
+        if question_text in question_to_steps:
+            log += "Intermediate Steps:\n"
+            steps = question_to_steps[question_text]
+            steps.sort(key=lambda x: x.get("timestamp", ""))
+            
+            for step in steps:
+                log += f"Step: {step.get('step_name', 'Unknown')}\n"
+                log += json.dumps(step, indent=4, ensure_ascii=False) + "\n\n"
+            
+            log += "-" * 40 + "\n\n"
+
+    return log
+
 
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 for round in range(max_rounds):
     graph: Graph = experiment()
     runs = filter(lambda x: not x.correct, graph.runs)
-    run = random.choice(runs)
-    avoid = [x.change for x in graph.children]
 
+    prompt = WORKFLOW_OPTIMIZE_PROMPT + WORKFLOW_INPUT.format(
+        experience = format_experience(graph),
+        score = graph.score,
+        graph = graph.graph,
+        prompt = graph.prompt,
+        operator_description = OPERATOR_DESCRIPTION,
+        log=load_log(runs)
+    )
     
-    store graph as file, use traditional aflow touch.
-
 
     gather experience, log, 
     and make modification.
