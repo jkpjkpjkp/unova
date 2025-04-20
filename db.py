@@ -34,37 +34,28 @@ class MyStr(str):
     def format(self, *args, **kwargs):
         formatter = TupleFormatter()
         return formatter.format(self, *args, **kwargs)
+    
 
-class MyHash:
-    def __hash__(self):
-        def hash():
-            code = '\n'.join(str(getattr(self, field)) for field in self._hash_fields)
-            self.id = hashlib.sha256(code.encode('utf-8')).digest()
-        return self.id or int.from_bytes(hash(), 'big')
-    def __eq__(self, other):
-        return self.__hash__() == other.__hash__()
-
-class Graph(MyHash, SQLModel, table=True):
+class Graph(SQLModel, table=True):
     id: int = Field(primary_key=True)
     graph: str
     prompt: str
-    father_id: Optional[int] = Field(default=NotImplemented)
+    father_id: Optional[int] = Field(default=None)
     children_id: list[int] = Field(default=[], sa_column=Column(JSON))
     change: Optional[str] = Field(default=None)
 
     runs: list["Run"] = Relationship(back_populates="graph")
-    _hash_fields = ('graph', 'prompt')
 
     @property
     def father(self):
         if not self.father_id:
             return None
-        with Session(engine) as session:
+        with Session(_engine) as session:
             return session.get(Graph, self.father_id)
     
     @property
     def children(self):
-        with Session(engine) as session:
+        with Session(_engine) as session:
             return [session.get(Graph, id) for id in self.children_id]
 
 
@@ -145,7 +136,7 @@ class Graph(MyHash, SQLModel, table=True):
         return log_to_db_wrapper(extract_local_variables_wrapper(graph.run))
 
 
-class Run(MyHash, SQLModel, table=True):
+class Run(SQLModel, table=True):
     graph_id: int = Field(primary_key=True, foreign_key="graph.id")
     task_id: str = Field(primary_key=True)
     log: Dict[str, Any] = Field(sa_column=Column(JSON))
@@ -153,7 +144,6 @@ class Run(MyHash, SQLModel, table=True):
     correct: bool
 
     graph: Graph = Relationship(back_populates="runs")
-    _hash_fields = ('graph_id', 'task_id', 'log')
 
     @property
     def task(self):
@@ -182,15 +172,12 @@ def get_high_variation_task(k=1):
     return ret
 
 def put(x):
-    if isinstance(x, Graph):
-        x.id = x.id or x.__hash__()
     with Session(_engine) as session:
-        merged_x = session.merge(x)
+        session.add(x)
         session.commit()
-        session.refresh(merged_x)
-    return merged_x
+        return x
 
-def get_graph_from_a_folder(folder: str, groph: bool = False):
+def get_graph_from_a_folder(folder: str):
     with open(os.path.join(folder, "graph.py"), "r") as f:
         graph = f.read()
     with open(os.path.join(folder, "prompt.py"), "r") as f:
@@ -205,9 +192,16 @@ def test_get_graph_from_a_folder():
     with Session(_engine) as session:
         print(len(session.exec(select(Graph)).all()))
 
-def get_strongest_graph(k=1):
+def get_strongest_graph(k: int):
     with Session(_engine) as session:
-        return session.exec(select(Graph).order_by(func.avg(Run.correct).desc()).limit(k)).all()
+        stmt = (
+            select(Graph)
+            .join(Run)
+            .group_by(Graph.id)
+            .order_by(func.avg(Run.correct).desc())
+            .limit(k)
+        )
+        return session.exec(stmt).all()
     
 def get_hardest_task(k=1):
     with Session(_engine) as session:

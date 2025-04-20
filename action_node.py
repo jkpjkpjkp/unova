@@ -1443,7 +1443,6 @@ class Crop(Operator):
 
 def test_crop():
     crop = Crop()()
-import requests
 import numpy as np
 from PIL import Image
 from som import inference_sam_m2m_auto
@@ -1493,14 +1492,19 @@ def image_mask_to_alpha(image, mask):
     masked.putalpha(alpha_mask)
     return masked
 
+
+def area(image) -> int:
+    s = sum(image.getdata(band=3))
+    assert s % 255 == 0
+    return s // 255
+
 def alpha_to_mask(image):
-    segmentation = image.split()[-1]
+    segmentation = np.array(image.getdata(band=3)) // 255
     bbox = segmentation.getbbox()
-    area = area(image)
     return {
         'segmentation': segmentation,
         'bbox': bbox,
-        'area': area,
+        'area': area(image),
     }
 
 def sam_operator(image):
@@ -1508,16 +1512,19 @@ def sam_operator(image):
     sorted_anns = sorted(ret, key=(lambda x: x['area']), reverse=True)
     sorted_anns = sorted_anns[:10]
     # a mask of all area not being masked:
-    mask_neg = image.copy().to('RGBA')
+    mask_neg = image.copy().convert('RGBA')
     for ann in sorted_anns:
         mask = ann['segmentation']
         mask_neg.putalpha(Image.fromarray((1 - mask) * 255, mode='L'))
-    sorted_anns = map(lambda ann: image_mask_to_alpha(image, ann), sorted_anns)
+    sorted_anns = list(map(lambda ann: image_mask_to_alpha(image, ann), sorted_anns))
     sorted_anns.append(mask_neg)
     return sorted_anns
 
 def combine(images: list[Image.Image]):
-    return functools.reduce(lambda a, b: a.alpha_composite(b), images, initial=Image.new('RGBA', images[0].size, (0, 0, 0, 0)))
+    ret = Image.new('RGBA', images[0].size, (0, 0, 0, 0))
+    for image in images:
+        ret.alpha_composite(image)
+    return ret
 
 def sam2_alpha(image):
     ret = call_mask_api(image)
