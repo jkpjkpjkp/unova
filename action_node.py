@@ -19,6 +19,8 @@ import asyncio
 from PIL import Image
 from pydantic import BaseModel, Field, BeforeValidator
 from typing_extensions import Annotated
+import uuid
+import datetime
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -1429,25 +1431,56 @@ class Crop(Operator):
         super().__init__(llm or LLM(), name)
     
     async def __call__(self, image, question):
-        bbox = (await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=image,mode='xml_fill'))['bbox']
-        return image.crop1000(bbox)
+        response = await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=image,mode='xml_fill')
+        bbox = response['bbox']
+        ret = image.crop1000(bbox)
+        uid = uuid.uuid4()
+        ret.save(f"crop_{uid}.png")
+        return ret
 
 def test_crop():
     crop = Crop()()
+import requests
+import io
+import numpy as np
+from PIL import Image
+from som import inference_sam_m2m_auto
+
+def call_mask_api(image: Image.Image, api_url: str = "http://localhost:7861/api/predict"):
+    image.convert('RGB')
+    img_byte_arr = io.BytesIO()
+    image.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    
+    response = requests.post(api_url, files={"data": img_byte_arr})
+    assert response.status_code == 200, f"API request failed with status code {response.status_code}: {response.text}"
+    
+    masks = response.json()
+    
+    for mask in masks:
+        mask['segmentation'] = np.array(mask['segmentation'])
+    
+    return masks
+
+def sam2_alpha(image):
+    ret = call_mask_api(image)
+    print(type(ret))
+    def alpha(image, mask):
+        masked = image.copy()
+        alpha_mask = Image.fromarray(mask['segmentation'] * 255, mode='L')
+        masked.putalpha(alpha_mask)
+        return masked
+    return list(map(alpha, image, ret))
+
+def set_of_mask(image):
+    ret = call_mask_api(image)
+    return inference_sam_m2m_auto(image=image, outputs=ret)
+
 
 operators = {
     'Custom': Custom(),
     'Crop': Crop(),
+    'SAM': call_mask_api,
+    'SoM': set_of_mask,
 }
 
-if __name__ == '__main__':
-    # Create the ActionNode from the CropOp model and generate the class
-    
-    # Instantiate the class with the intended field values
-    instance = CropOp(
-        thought="The question asks about the number of copies of 'a bit of everything' in the top right stack. I need to identify the bounding box that contains only the top right stack of books labeled 'a bit of everything'.",
-        bbox='25 542 315 915'
-    )
-    
-    # Output the result
-    print(instance)

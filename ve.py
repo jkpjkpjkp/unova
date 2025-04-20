@@ -6,35 +6,8 @@ from gradio_client import Client, handle_file
 import tempfile
 import os
 
-def sam2(image):
-    client = Client("http://localhost:7861/")
-    if isinstance(image, Image.Image):
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-            image.save(temp_file.name)
-            image_path = temp_file.name
-        try:
-            result = client.predict(
-                    input_image=handle_file(image_path),
-                    api_name="/predict"
-            )
-        finally:
-            os.remove(image_path) # Clean up the temporary file
-    else: # Assume it's already a path or URL if not a PIL Image
-        result = client.predict(
-                input_image=handle_file(image),
-                api_name="/predict"
-        )
-    return np.array([np.array(Image.open(x['image'])) for x in result])
-
-def sam2_imagecrop(image):
-    ret = sam2(image)
-    print(type(ret))
-    def mask_crop(image, mask):
-        masked = image.copy()
-        alpha_mask = Image.fromarray(mask * 255, mode='L')
-        masked.putalpha(alpha_mask)
-        return masked
-    return map(mask_crop, ret)
+def center(img: Image.Image):
+    return np.average(np.where(img.to_numpy()))
 
 class VisualEntity:
     _img: Image.Image | list['VisualEntity']
