@@ -6,9 +6,34 @@ import hashlib
 import os
 import sys
 import functools
+from string import Formatter
 from action_node import operators
+from PIL import Image
+import itertools
 
 db_name = "runs.db"
+
+class TupleFormatter(Formatter):
+    def format(self, format_string, *args, **kwargs):
+        if all(isinstance(x, str) for x in itertools.chain(args, kwargs.values())):
+            return super().format(format_string, *args, **kwargs)   
+        result = []
+        for literal_text, field_name, format_spec, conversion in self.parse(format_string):
+            if literal_text:
+                result.append(literal_text)
+            if field_name is not None:
+                value, _ = self.get_field(field_name, args, kwargs)
+                if isinstance(value, Image.Image):
+                    result.append(value)
+                else:
+                    formatted = self.format_field(value, format_spec)
+                    result.append(formatted)
+        return tuple(result)
+
+class MyStr(str):
+    def format(self, *args, **kwargs):
+        formatter = TupleFormatter()
+        return formatter.format(self, *args, **kwargs)
 
 class MyHash:
     def __hash__(self):
@@ -18,7 +43,6 @@ class MyHash:
         return self.id or int.from_bytes(hash(), 'big')
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
-
 
 class Graph(MyHash, SQLModel, table=True):
     id: int = Field(primary_key=True)
@@ -46,7 +70,11 @@ class Graph(MyHash, SQLModel, table=True):
         
         try:
             exec(graph_code, namespace)
-            graph = namespace.get("Graph")(operators=operators, prompt_custom=namespace)
+            graph_class = namespace.get("Graph")
+            namespace = {
+                k: (MyStr(v) if isinstance(v, str) else v) for k, v in namespace.items()
+            }
+            graph = graph_class(operators=operators, prompt_custom=namespace)
         except Exception:
             print("--- Error reading graph code ---")
             print(graph_code)
@@ -113,6 +141,11 @@ class Run(MyHash, SQLModel, table=True):
 
     graph: Graph = Relationship(back_populates="runs")
     _hash_fields = ('graph_id', 'task_id', 'log')
+
+    @propertyw
+    def task(self):
+        from zero import get_task_data
+        return get_task_data(self.task_id)
 
 _engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(_engine)

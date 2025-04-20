@@ -1462,6 +1462,7 @@ def call_mask_api(image: Image.Image, api_url: str = "http://localhost:7861/api/
     
     return masks
 
+
 def test_api():
     image = Image.open('/mnt/home/jkp/hack/diane/data/zerobench_images/zerobench/example_21_image_0.png')
     ret = call_mask_api(image)
@@ -1489,6 +1490,19 @@ def alpha_to_mask(image):
         'area': area,
     }
 
+def sam_operator(image):
+    ret = call_mask_api(image)
+    sorted_anns = sorted(ret, key=(lambda x: x['area']), reverse=True)
+    sorted_anns = sorted_anns[:10]
+    # a mask of all area not being masked:
+    mask_neg = image.copy().to('RGBA')
+    for ann in sorted_anns:
+        mask = ann['segmentation']
+        mask_neg.putalpha(Image.fromarray((1 - mask) * 255, mode='L'))
+    sorted_anns = map(lambda ann: image_mask_to_alpha(image, ann), sorted_anns)
+    sorted_anns.append(mask_neg)
+    return sorted_anns
+
 def combine(images: list[Image.Image]):
     return functools.reduce(lambda a, b: a.alpha_composite(b), images, initial=Image.new('RGBA', images[0].size, (0, 0, 0, 0)))
 
@@ -1510,7 +1524,7 @@ def set_of_mask(image):
 operators = {
     'Custom': Custom(),
     'Crop': Crop(),
-    'SAM': call_mask_api,
+    'SAM': sam_operator,
     'SoM': set_of_mask,
 }
 

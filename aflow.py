@@ -11,6 +11,7 @@ import itertools
 from pydantic import BaseModel
 
 from aflow_prompt import *
+from action_node import ActionNode, LLM
 
 max_rounds = 25
 
@@ -75,7 +76,7 @@ def format_operator_description(operators):
 def format_log(data):
     sample_size = min(3, len(data))
     log = ""
-    for sample in random.sample(data, k=sample_size):
+    for sample in data:
         log += json.dumps(sample, indent=4, ensure_ascii=False) + "\n\n"
     return log
 
@@ -89,6 +90,8 @@ asyncio.set_event_loop(loop)
 for round in range(max_rounds):
     graph: Graph = experiment()
     runs = filter(lambda x: not x.correct, graph.runs)
+    runs = random.sample(runs, min(3, len(runs)))
+    run_imgs = [run.task[0].thumbnail(764, 764) for run in runs]
 
     prompt = WORKFLOW_OPTIMIZE_PROMPT + WORKFLOW_INPUT.format(
         experience = format_experience(graph),
@@ -104,7 +107,3 @@ for round in range(max_rounds):
         llm=LLM(model='gemini-2.5-pro-exp-03-25'),
         mode="xml_fill",
     )
-
-    sam result will cause massive vlm call, should only SoM and crop. this also make present() Image only. 
-
-    log contain thumbnail of original task image only
