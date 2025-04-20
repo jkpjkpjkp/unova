@@ -1444,14 +1444,11 @@ class Crop(Operator):
 def test_crop():
     crop = Crop()()
 import requests
-import io
 import numpy as np
 from PIL import Image
 from som import inference_sam_m2m_auto
 import functools
 from gradio_client import Client, handle_file
-import requests
-import os
 
 def call_mask_api(image):
     import uuid
@@ -1461,15 +1458,6 @@ def call_mask_api(image):
     client = Client(server_url)
     filename = client.predict(image=handle_file(image_file), api_name="/predict")
 
-    download_url = f"{server_url}/file={filename}"
-
-    response = requests.get(download_url)
-    assert response.status_code == 200, f"Failed to download the file. Status code: {response.status_code}"
-    
-    with open(filename, "wb") as f:
-        f.write(response.content)
-    print(f"File downloaded successfully: {filename}")
-    
     data = np.load(filename)
     segmentations = data['segmentations']
     areas = data['areas']
@@ -1494,9 +1482,7 @@ def test_api():
     image = Image.open('/mnt/home/jkp/hack/diane/data/zerobench_images/zerobench/example_21_image_0.png')
     ret = call_mask_api(image)
     print(type(ret))
-    print(ret.keys())
-    for x, y in ret.items():
-        print(x, y)
+    print(len(ret))
 
 if __name__ == '__main__':
     test_api()

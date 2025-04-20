@@ -1,8 +1,6 @@
 import numpy as np
 from visualizer import Visualizer
-from typing import Tuple
 import matplotlib.pyplot as plt
-import cv2
 
 
 def inference_sam_m2m_auto(image, outputs, label_mode='1', alpha=0.1, anno_mode=['Mask']):
