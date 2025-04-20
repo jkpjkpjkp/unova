@@ -11,7 +11,7 @@ INFO_SPREAD="""I will explain to you your current task.  we are trying to answer
 
 So please provide concise information for ultimately answering the question, in curly braces {{helpful information}}. if the image part assigned to you contains no relevant information, conclude with empty curly braces {{}}. 
 
-Let's think step by step, and put the final information in curly braces like this: {{information}}
+Let's think step by step and give the final visual-information extraction in curly braces like this: {{information}}
 """
 
 
@@ -24,17 +24,8 @@ Here are the responses from all agents each presented with an un-overlapping par
 
 please answer the original vqa question.
 
-let's think step by step, and put your final answer in curly braces lie this: {{final answer}}
-{{SoM_image}}
+let's think step by step and give the final answer in curly braces like this: {{final answer}}
+{SoM_image}
 """
 
 COT = "\n\n\nLet’s think step by step and give the final answer in curly braces, like this: {{final_answer}}"
-
-AUGMENTATION_EXPLENATION = """{question}
-these are some sam masks and related caption in this image.
-each mask contains a caption, pixel coordinate, and depth. 
-{masks}
-
-
-Let’s think step by step and give the final answer in curly braces, like this: {{final_answer}}
-"""

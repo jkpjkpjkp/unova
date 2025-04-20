@@ -1280,11 +1280,11 @@ class ActionNode:
         """
         
         if isinstance(context, tuple):
-            from ve import VE
             for x in context:
-                assert isinstance(x, str) or isinstance(x, VE)
-            images.extend([x for x in context if isinstance(x, VE)])
-            context = '\n'.join(x for x in context if isinstance(x, str))
+                assert isinstance(x, str) or isinstance(x, Image.Image)
+            assert not images
+            images = [x for x in context if isinstance(x, Image.Image)]
+            context = ' '.join(x if isinstance(x, str) else '<image>' for x in context)
 
         self.set_llm(llm)
         self.set_context(context)
@@ -1403,8 +1403,8 @@ class Operator:
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
-    async def _fill_node(self, op_class, prompt, mode=None, **extra_kwargs):
-        fill_kwargs = {"context": prompt, "llm": self.llm}
+    async def _fill_node(self, op_class, context, mode=None, **extra_kwargs):
+        fill_kwargs = {"context": context, "llm": self.llm}
         if mode:
             fill_kwargs["mode"] = mode
         fill_kwargs.update(extra_kwargs)
