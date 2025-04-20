@@ -1413,6 +1413,11 @@ class Operator:
         node = await ActionNode.from_pydantic(op_class).fill(**fill_kwargs)
         return node.instruct_content.model_dump()
 
+def crop1000(image, box: tuple):
+    x, y = image.width, image.height
+    return image.crop((box[1] / 1000 * x, box[0] / 1000 * y, box[3] / 1000 * x, box[2] / 1000 * y))
+    
+
 class Custom(Operator):
     def __init__(self, llm: LLM = None, name: str = "Custom"):
         super().__init__(llm or LLM(), name)
@@ -1432,7 +1437,7 @@ class Crop(Operator):
     async def __call__(self, image, question):
         response = await self._fill_node(CropOp, CROP_PROMPT.format(question=question), images=[image],mode='xml_fill')
         bbox = response['bbox']
-        ret = image.crop1000(bbox)
+        ret = crop1000(image, bbox)
         uid = uuid.uuid4()
         ret.save(f"crop_{uid}.png")
         return ret

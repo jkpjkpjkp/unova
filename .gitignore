@@ -13,3 +13,4 @@ db/
 *.shelve*
 *.db
 snapshots/
+*.png
