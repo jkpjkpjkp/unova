@@ -1449,14 +1449,17 @@ import numpy as np
 from PIL import Image
 from som import inference_sam_m2m_auto
 import functools
-from gradio_client import Client
+from gradio_client import Client, handle_file
 import requests
 import os
 
 def call_mask_api(image):
+    import uuid
+    image_file = f'{uuid.uuid4()}.png'
+    image.save(image_file)
     server_url = "http://localhost:7861"
     client = Client(server_url)
-    filename = client.predict(image=image, api_name="/predict")
+    filename = client.predict(image=handle_file(image_file), api_name="/predict")
 
     download_url = f"{server_url}/file={filename}"
 
