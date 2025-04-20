@@ -85,6 +85,7 @@ class GenericMask:
             return
 
         if isinstance(m, np.ndarray):  # assumed to be a binary mask
+            print(m.shape)
             assert m.shape[1] != 2, m.shape
             assert m.shape == (
                 height,
@@ -144,6 +145,8 @@ class GenericMask:
         return self.mask.sum()
 
     def bbox(self):
+        print(self.polygons)
+        print(self.height, self.width)
         p = mask_util.frPyObjects(self.polygons, self.height, self.width)
         p = mask_util.merge(p)
         bbox = mask_util.toBbox(p)
@@ -1116,29 +1119,15 @@ class Visualizer:
     def draw_binary_mask_with_number(
         self, binary_mask, color=None, *, edge_color=None, text=None, label_mode='1', alpha=0.1, anno_mode=['Mask'], area_threshold=10
     ):
-        """
-        Args:
-            binary_mask (ndarray): numpy array of shape (H, W), where H is the image height and
-                W is the image width. Each value in the array is either a 0 or 1 value of uint8
-                type.
-            color: color of the mask. Refer to `matplotlib.colors` for a full list of
-                formats that are accepted. If None, will pick a random color.
-            edge_color: color of the polygon edges. Refer to `matplotlib.colors` for a
-                full list of formats that are accepted.
-            text (str): if None, will be drawn on the object
-            alpha (float): blending efficient. Smaller values lead to more transparent masks.
-            area_threshold (float): a connected component smaller than this area will not be shown.
-
-        Returns:
-            output (VisImage): image object with mask drawn.
-        """
+        binary_mask = binary_mask.astype("uint8")  # opencv needs uint8
+        if not binary_mask.any():  # Check if the mask is all zeros
+            return self.output  # Skip drawing and return the unchanged output
         if color is None:
             randint = random.randint(0, len(self.color_proposals)-1)
             color = self.color_proposals[randint]
         color = mplc.to_rgb(color)
 
         has_valid_segment = True
-        binary_mask = binary_mask.astype("uint8")  # opencv needs uint8
         mask = GenericMask(binary_mask, self.output.height, self.output.width)
         shape2d = (binary_mask.shape[0], binary_mask.shape[1])
         bbox = mask.bbox()

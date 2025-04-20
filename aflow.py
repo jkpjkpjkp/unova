@@ -36,19 +36,24 @@ def compute_probabilities(self, scores, alpha=0.2, lambda_=0.3):
     return mixed_prob
 
 async def experiment(
-    num_graph=7,
-    num_task=14,
-) -> Graph:
+    num_graph=2,
+    num_task=2,
+):
     # selecting highest variation is self-stabilizing (good). 
     tasks = get_high_variation_task(num_task)
     graphs = get_strongest_graph(num_graph)
 
+    num_graph = len(graphs)
+    assert num_graph > 0
+    assert num_task == len(tasks)
+
     run = [[None for _ in range(num_task)] for _ in range(num_graph)]
     for i, graph in enumerate(graphs):
         for j, task_id in enumerate(tasks):
-            run[i, j] = graph.run(get_task_data(task_id))
+            run[i][j] = graph.run()(get_task_data(task_id))
     
-    res = [[await x for x in y] for y in run]
+    print(type(run[0][0])) # <class 'function'>
+    res = [[(await x) for x in y] for y in run]
     score = [sum(x[1] for x in y) / len(y) for y in res]
     graph = graphs[np.random.choice(len(graphs), p=compute_probabilities(score))]
     return graph

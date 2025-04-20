@@ -35,8 +35,6 @@ def get_task_data(task_id):
     assert filtered_df.height == 1, f"Task ID {task_id} not found or duplicate."
 
     row = filtered_df.row(0, named=True)
-    
-    question_text = row['question_text']
 
     images = row['question_images_decoded']
     
@@ -44,6 +42,7 @@ def get_task_data(task_id):
     
     image_data = images[0]['bytes']
     
-    image = Image.open(io.BytesIO(image_data))
+    row['image'] = Image.open(io.BytesIO(image_data))
+    row['question'] = row['question_text']
     
-    return (image, question_text)
+    return row

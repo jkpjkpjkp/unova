@@ -711,7 +711,6 @@ def repair_escape_error(commands):
 
     Example:
         When the original JSON string is " {"content":"\\\\( \\\\frac{1}{2} \\\\)"} ",
-        The "content" will be parsed correctly to "\( \frac{1}{2} \)".
 
         However, if the original JSON string is " {"content":"\( \frac{1}{2} \)"}" directly.
         It will cause a parsing error.
@@ -1358,6 +1357,8 @@ class ActionNode:
 class GenerateOp(BaseModel):
     response: str = Field(default="", description="Your solution for this problem")
 def parse_bbox_string(v: str) -> Tuple[int, int, int, int]:
+    if v.startswith('['):
+        v = v[1:-1]
     try:
         numbers = v.split()
         if len(numbers) != 4:
@@ -1365,6 +1366,7 @@ def parse_bbox_string(v: str) -> Tuple[int, int, int, int]:
         return tuple(int(num) for num in numbers)
     except (ValueError, TypeError):
         raise ValueError("Invalid bbox format; expected 'num num num num'")
+
 BBoxType = Annotated[Tuple[int, int, int, int], BeforeValidator(parse_bbox_string)]
 
 class CropOp(BaseModel):
@@ -1476,7 +1478,6 @@ def call_mask_api(image):
     print(f"Reconstructed {len(masks)} masks")
     return masks
 
-
 def test_api():
     image = Image.open('/mnt/home/jkp/hack/diane/data/zerobench_images/zerobench/example_21_image_0.png')
     ret = call_mask_api(image)
@@ -1488,22 +1489,23 @@ if __name__ == '__main__':
 
 def image_mask_to_alpha(image, mask):
     masked = image.copy()
-    alpha_mask = Image.fromarray(mask['segmentation'] * 255, mode='L')
+    alpha_mask = Image.fromarray(mask['segmentation'] * 255, mode='L')  # size becomes (width, height)
     masked.putalpha(alpha_mask)
     return masked
 
-
 def area(image) -> int:
-    s = sum(image.getdata(band=3))
-    assert s % 255 == 0
-    return s // 255
+    if isinstance(image, Image.Image):
+        image = image.getdata(band=3)
+    a = sum(image)
+    assert a % 255 == 0
+    return a // 255
 
 def alpha_to_mask(image):
-    segmentation = np.array(image.getdata(band=3)) // 255
-    bbox = segmentation.getbbox()
+    alpha_data = image.getdata(band=3)
+    alpha_array = np.array(alpha_data).reshape((image.height, image.width))  # Reshape to (height, width)
     return {
-        'segmentation': segmentation,
-        'bbox': bbox,
+        'segmentation': alpha_array // 255,
+        'bbox': image.getbbox(),
         'area': area(image),
     }
 
@@ -1511,11 +1513,17 @@ def sam_operator(image):
     ret = call_mask_api(image)
     sorted_anns = sorted(ret, key=(lambda x: x['area']), reverse=True)
     sorted_anns = sorted_anns[:10]
-    # a mask of all area not being masked:
     mask_neg = image.copy().convert('RGBA')
-    for ann in sorted_anns:
-        mask = ann['segmentation']
-        mask_neg.putalpha(Image.fromarray((1 - mask) * 255, mode='L'))
+    
+    # Compute the union of all masks
+    if sorted_anns:
+        union_mask = np.zeros_like(sorted_anns[0]['segmentation'], dtype=bool)
+        for ann in sorted_anns:
+            union_mask |= ann['segmentation'].astype(bool)
+        # Set alpha to complement of union mask (opaque where no mask exists)
+        mask_neg.putalpha(Image.fromarray((~union_mask).astype(np.uint8) * 255, mode='L'))
+    
+    # Apply individual masks to images
     sorted_anns = list(map(lambda ann: image_mask_to_alpha(image, ann), sorted_anns))
     sorted_anns.append(mask_neg)
     return sorted_anns
@@ -1529,12 +1537,15 @@ def combine(images: list[Image.Image]):
 def sam2_alpha(image):
     ret = call_mask_api(image)
     print(type(ret))
-    return list(map(alpha_to_mask, image, ret))
+    # Note: This function seems incorrect as map expects multiple arguments correctly;
+    # assuming intent was to apply alpha_to_mask to masked images, but adjusting based on context
+    masked_images = list(map(lambda mask: image_mask_to_alpha(image, mask), ret))
+    return list(map(alpha_to_mask, masked_images))
 
 def set_of_mask(image):
     if isinstance(image, list):
         assert isinstance(image[0], Image.Image)
-        ret = map(alpha_to_mask, image)
+        ret = list(map(alpha_to_mask, image))  # Convert map to list
         image = combine(image)
     elif isinstance(image, Image.Image):
         ret = call_mask_api(image)

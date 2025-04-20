@@ -5,6 +5,6 @@ from sample.crop_seg.prompt import prompt_dict
 import asyncio
 
 if __name__ == "__main__":
-    image, task = get_task_data('37_3')
+    task = get_task_data('37_3')
     graph = Graph(operators=operators, prompts=prompt_dict)
-    print(asyncio.run(graph.run((image, task))))
+    print(asyncio.run(graph.run((task['image'], task['question']))))

@@ -66,8 +66,6 @@ class Graph(SQLModel, table=True):
         with open(os.path.join(foldername, "prompt.py"), "r") as f:
             prompt = f.read()
         return Graph(graph=graph, prompt=prompt)
-
-    @property
     def run(self):
         graph_code = self.graph + '\n' + self.prompt
         namespace = {'__name__': '__exec__', '__package__': None}
@@ -78,7 +76,7 @@ class Graph(SQLModel, table=True):
             namespace = {
                 k: (MyStr(v) if isinstance(v, str) else v) for k, v in namespace.items()
             }
-            graph = graph_class(operators=operators, prompt_custom=namespace)
+            graph = graph_class(operators=operators, prompts=namespace)
         except Exception:
             print("--- Error reading graph code ---")
             print(graph_code)
@@ -111,15 +109,12 @@ class Graph(SQLModel, table=True):
             def decorator(func):
                 @functools.wraps(func)
                 async def wrapper(task):
-                    answer = task.pop('question_answer')
-                    result, captured_locals = await func(task)
-                    task['question_id'] = answer
-                    task_id = task['question_id']
+                    result, captured_locals = await func((task['image'], task['question']))
                     correct = (result == task['question_answer'])
                     
                     run = Run(
                         graph_id=graph_id,
-                        task_id=task_id,
+                        task_id=task['question_id'],
                         log=captured_locals,
                         final_output=result,
                         correct=correct
@@ -133,8 +128,7 @@ class Graph(SQLModel, table=True):
                 return wrapper
             return decorator
         
-        return log_to_db_wrapper(extract_local_variables_wrapper(graph.run))
-
+        return log_to_db_wrapper(self.id)(extract_local_variables_wrapper(graph.run))
 
 class Run(SQLModel, table=True):
     graph_id: int = Field(primary_key=True, foreign_key="graph.id")
@@ -194,15 +188,21 @@ def test_get_graph_from_a_folder():
 
 def get_strongest_graph(k: int):
     with Session(_engine) as session:
-        stmt = (
+        stmt_zero_runs = select(Graph).where(~Graph.runs.any()).limit(k)
+        graphs_with_zero_runs = session.exec(stmt_zero_runs).all()
+        if len(graphs_with_zero_runs) >= k:
+            return graphs_with_zero_runs[:k]
+        remaining = k - len(graphs_with_zero_runs)
+        stmt_with_runs = (
             select(Graph)
             .join(Run)
             .group_by(Graph.id)
             .order_by(func.avg(Run.correct).desc())
-            .limit(k)
+            .limit(remaining)
         )
-        return session.exec(stmt).all()
-    
+        graphs_with_runs = session.exec(stmt_with_runs).all()
+        return graphs_with_zero_runs + graphs_with_runs
+
 def get_hardest_task(k=1):
     with Session(_engine) as session:
         return session.exec(
