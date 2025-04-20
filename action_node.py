@@ -1445,6 +1445,7 @@ import io
 import numpy as np
 from PIL import Image
 from som import inference_sam_m2m_auto
+import functools
 
 def call_mask_api(image: Image.Image, api_url: str = "http://localhost:7861/api/predict"):
     image.convert('RGB')
@@ -1462,18 +1463,48 @@ def call_mask_api(image: Image.Image, api_url: str = "http://localhost:7861/api/
     
     return masks
 
+def test_api():
+    image = Image.open('/mnt/home/jkp/hack/diane/data/zerobench_images/zerobench/example_21_image_0.png')
+    ret = call_mask_api(image)
+    print(type(ret))
+    print(ret.keys())
+    for x, y in ret.items():
+        print(x, y)
+
+if __name__ == '__main__':
+    test_api()
+
+def image_mask_to_alpha(image, mask):
+    masked = image.copy()
+    alpha_mask = Image.fromarray(mask['segmentation'] * 255, mode='L')
+    masked.putalpha(alpha_mask)
+    return masked
+
+def alpha_to_mask(image):
+    segmentation = image.split()[-1]
+    bbox = segmentation.getbbox()
+    area = area(image)
+    return {
+        'segmentation': segmentation,
+        'bbox': bbox,
+        'area': area,
+    }
+
+def combine(images: list[Image.Image]):
+    return functools.reduce(lambda a, b: a.alpha_composite(b), images, initial=Image.new('RGBA', images[0].size, (0, 0, 0, 0)))
+
 def sam2_alpha(image):
     ret = call_mask_api(image)
     print(type(ret))
-    def alpha(image, mask):
-        masked = image.copy()
-        alpha_mask = Image.fromarray(mask['segmentation'] * 255, mode='L')
-        masked.putalpha(alpha_mask)
-        return masked
-    return list(map(alpha, image, ret))
+    return list(map(alpha_to_mask, image, ret))
 
 def set_of_mask(image):
-    ret = call_mask_api(image)
+    if isinstance(image, list):
+        assert isinstance(image[0], Image.Image)
+        ret = map(alpha_to_mask, image)
+        image = combine(image)
+    elif isinstance(image, Image.Image):
+        ret = call_mask_api(image)
     return inference_sam_m2m_auto(image=image, outputs=ret)
 
 
@@ -1484,3 +1515,9 @@ operators = {
     'SoM': set_of_mask,
 }
 
+operators_doc = {
+    'Custom': {
+        'description': "A simple vlm call.",
+        'interface': "custom(input: str | tuple[str | Image.Image]):"
+    },
+}
