@@ -1,14 +1,8 @@
-import torch
 import numpy as np
-from torchvision import transforms
 from visualizer import Visualizer
 from typing import Tuple
-from PIL import Image
-from detectron2.data import MetadataCatalog
 import matplotlib.pyplot as plt
 import cv2
-import io
-from segment_anything import SamAutomaticMaskGenerator
 
 
 def inference_sam_m2m_auto(image, outputs, label_mode='1', alpha=0.1, anno_mode=['Mask']):
@@ -34,7 +28,6 @@ def remove_small_regions(
     Removes small disconnected regions and holes in a mask. Returns the
     mask and an indicator of if the mask has been modified.
     """
-    import cv2  # type: ignore
 
     assert mode in ["holes", "islands"]
     correct_holes = mode == "holes"

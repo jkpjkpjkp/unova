@@ -1,7 +1,7 @@
 import asyncio
 import time
 import os
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 from loguru import logger
@@ -11,7 +11,6 @@ from aflow.convergence_utils import ConvergenceUtils
 from aflow.data_utils import DataUtils
 from aflow.evaluation_utils import EvaluationUtils
 from aflow.experience_utils import ExperienceUtils
-from aflow.graph_utils import GraphUtils
 from action_node import LLM
 
 QuestionType = Literal["math", "code", "qa", "vqa"]

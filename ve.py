@@ -2,9 +2,6 @@ from typing import Iterator
 from PIL import Image
 import functools
 import numpy as np
-from gradio_client import Client, handle_file
-import tempfile
-import os
 
 def center(img: Image.Image):
     return np.average(np.where(img.to_numpy()))

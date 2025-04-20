@@ -17,10 +17,9 @@ from json import JSONDecodeError
 from json.decoder import _decode_uXXXX
 import asyncio
 from PIL import Image
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BeforeValidator
 from typing_extensions import Annotated
 import uuid
-import datetime
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:

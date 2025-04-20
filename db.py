@@ -118,8 +118,6 @@ _engine = create_engine(f"sqlite:///{db_name}")
 SQLModel.metadata.create_all(_engine)
 
 import polars as pl
-from PIL import Image
-import io
 
 df = pl.read_parquet('/home/jkp/Téléchargements/zerobench_subquestions-00000-of-00001.parquet')
 tasks = df['question_id'].to_list()
