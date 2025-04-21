@@ -74,8 +74,16 @@ def format_experience(graph):
     experience += "\n\nNote: Take into account past failures and avoid repeating the same mistakes, as these failures indicate that these approaches are ineffective. You must fundamentally change your way of thinking, rather than simply using more advanced Python syntax like for, if, else, etc., or modifying the prompt."
     return experience
 
-def format_operator_description(operators):
-    return '\n'.join(OPERATOR_DESCRIPTION.format(id=i, name=op.name, description=op.description, interface=op.interface) for i, op in enumerate(operators))
+def format_operator_description(operators_doc):
+    descriptions = []
+    for i, (name, doc) in enumerate(operators_doc.items()):
+        descriptions.append(OPERATOR_DESCRIPTION.format(
+            id=i,
+            name=name,
+            description=doc['description'],
+            interface=doc['interface']
+        ))
+    return '\n'.join(descriptions)
 
 def format_log(data):
     log = ""

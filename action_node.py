@@ -1615,13 +1615,25 @@ def set_of_mask(image):
 operators = {
     'Custom': Custom(),
     'Crop': Crop(),
-    # 'SAM': sam_operator,
-    # 'SoM': set_of_mask,
+    'SAM': sam_operator,
+    'SoM': set_of_mask,
 }
 
 operators_doc = {
     'Custom': {
-        'description': "A simple vlm call.",
-        'interface': "custom(input: str | tuple[str | Image.Image]):"
+        'description': "A general-purpose operator that processes input through a language model and returns structured output.",
+        'interface': "custom(input: str | tuple[str | Image.Image], pydantic_model=GenerateOp)"
     },
+    'Crop': {
+        'description': "Crops an image to focus on the region relevant to answering a specific question. Returns a cropped PIL Image.",
+        'interface': "crop(image: Image.Image, question: str) -> Image.Image"
+    },
+    'SAM': {
+        'description': "Segments an image into multiple masks using Segment Anything Model (SAM). Returns list of masked images.",
+        'interface': "sam_operator(image: Image.Image) -> list[Image.Image]"
+    },
+    'SoM': {
+        'description': "Set of Masks operator that combines SAM with M2M for enhanced segmentation. Returns a single segmentation mask.",
+        'interface': "set_of_mask(image: Image.Image | list[Image.Image]) -> Image.Image"
+    }
 }
