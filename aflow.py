@@ -65,7 +65,7 @@ async def experiment(
 def format_experience(graph):
     failures = [x for x in graph.children if x.score <= graph.score]
     successes = [x for x in graph.children if x.score > graph.score]
-    experience = f"Original Score: {graph['score']}\n"
+    experience = f"Original Score: {graph.score}\n"
     experience += "These are some conclusions drawn from experience:\n\n"
     for failure in failures:
         experience += f"-Absolutely prohibit {failure.modification} (Score: {failure.score})\n"

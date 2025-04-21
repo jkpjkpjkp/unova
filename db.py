@@ -45,6 +45,20 @@ class Graph(SQLModel, table=True):
     change: Optional[str] = Field(default=None)
     runs: list["Run"] = Relationship(back_populates="graph")
 
+    @property
+    def score(self) -> float:
+        with Session(_engine) as session:
+            # Get all runs for this graph
+            runs = session.exec(
+                select(Run.correct).where(Run.graph_id == self.id)
+            ).all()
+            
+            if not runs:
+                return 1.0
+            
+            # Calculate the ratio of correct runs
+            return sum(1 for run in runs if run) / len(runs)
+
     @classmethod
     def from_folder(cls, foldername):
         with open(os.path.join(foldername, "graph.py"), "r") as f:
@@ -108,6 +122,17 @@ class Graph(SQLModel, table=True):
             def decorator(func):
                 @functools.wraps(func)
                 async def wrapper(task):
+                    # Check if this graph has already run this task
+                    with Session(_engine) as session:
+                        existing_run = session.exec(
+                            select(Run).where(
+                                Run.graph_id == graph_id,
+                                Run.task_id == task['question_id']
+                            )
+                        ).first()
+                        if existing_run:
+                            return existing_run.final_output, existing_run.correct
+
                     result, captured_locals = await func((task['image'], task['question']))
                     correct = (result == task['question_answer'])
 
@@ -117,7 +142,7 @@ class Graph(SQLModel, table=True):
                     run = Run(
                         graph_id=graph_id,
                         task_id=task['question_id'],
-                        log=patch_keep_only_str(captured_locals), # TODO: FIXME: this contain image, and sqlalchemy complains. we can remove them, or turn them into binary, or into uuit file
+                        log=patch_keep_only_str(captured_locals),
                         final_output=result,
                         correct=correct
                     )
@@ -139,7 +164,7 @@ class Graph(SQLModel, table=True):
             return decorator
         
         return log_to_db_wrapper(self.id)(extract_local_variables_wrapper(graph.run))
-
+    
 class Run(SQLModel, table=True):
     graph_id: int = Field(primary_key=True, foreign_key="graph.id")
     task_id: str = Field(primary_key=True)
