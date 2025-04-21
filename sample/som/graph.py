@@ -6,6 +6,7 @@ class Graph:
         self.prompts = prompts
     
     async def run(self, question: tuple[Image.Image, str]) -> str:
-        image = await self.som(question[0])
-        response = await self.custom(input=self.prompts['COT'].format(image=image, question=question[1]))
+        image = question[0]
+        set_of_mask = await self.som(image)
+        response = await self.custom(input=self.prompts['COT'].format(original_image=image, set_of_mask_image=set_of_mask, question=question[1]))
         return response['response']

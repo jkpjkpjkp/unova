@@ -21,6 +21,8 @@ from pydantic import BeforeValidator
 from typing_extensions import Annotated
 import uuid
 import matplotlib.pyplot as plt
+import numpy as np
+from visualizer import Visualizer
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -1539,7 +1541,6 @@ def test_api():
 def image_mask_to_alpha(image, mask):
     masked = image.copy()
     alpha_mask = Image.fromarray(mask['segmentation'].astype('uint8') * 255, mode='L')  # size becomes (width, height)
-    print(mask['segmentation'] * 255)
     # assert alpha_mask.getpixel((np.where(mask['segmentation'])[1][0], np.where(mask['segmentation'])[0][0])) == 255, alpha_mask.getpixel((np.where(mask['segmentation'])[1][0], np.where(mask['segmentation'])[0][0]))
     masked.putalpha(alpha_mask)
     assert masked.getbbox()
@@ -1553,7 +1554,6 @@ def test_image_mask_to_alpha():
         'bbox': (0, 0, 10, 12),
         'area': 120,
     }
-    print(mask['segmentation'].shape)
     ret = image_mask_to_alpha(image, mask)
     assert area(ret) == 120
     assert ret.getbbox() == (0, 0, 10, 12)
@@ -1631,10 +1631,42 @@ async def set_of_mask(image):
     ret, _anns = inference_sam_m2m_auto(image=image, outputs=ret)
     return Image.fromarray(ret)
 
+async def set_of_mask_with_number(image):
+    if isinstance(image, list):
+        assert isinstance(image[0], Image.Image)
+        ret = list(map(alpha_to_mask, image))
+        image = combine(image)
+    elif isinstance(image, Image.Image):
+        ret = call_mask_api(image)
+    
+    # Convert image to numpy array if it's not already
+    image_array = np.array(image)
+    
+    # Create visualizer instance
+    visualizer = Visualizer(image_array)
+    
+    # Sort masks by area for consistent numbering of larger objects first
+    sorted_anns = sorted(ret, key=(lambda x: x['area']), reverse=True)
+    
+    # Draw numbered masks
+    for idx, mask in enumerate(sorted_anns, start=1):
+        binary_mask = mask['segmentation']
+        visualizer.draw_binary_mask_with_number(
+            binary_mask,
+            text=str(idx),
+            label_mode='1',  # Use numeric labels
+            alpha=0.3,
+            anno_mode=['Mask', 'Mark', 'Box']  # Show mask, number, and bounding box
+        )
+    
+    # Get the final image directly from the visualizer
+    result = visualizer.get_output().get_image()
+    return Image.fromarray(result)
+
 async def test_set_of_mask():
     from zero import get_task_data
     image = get_task_data('37_3')['image']
-    ret = await set_of_mask(image)
+    ret = await set_of_mask_with_number(image)
     ret.save('test.png')
 
 if __name__ == '__main__':
@@ -1644,7 +1676,7 @@ operators = {
     'Custom': Custom(),
     'Crop': Crop(),
     # 'SAM': sam_operator,
-    'SoM': set_of_mask,
+    'SoM': set_of_mask_with_number,
 }
 
 operators_doc = {

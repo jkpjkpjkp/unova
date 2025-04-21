@@ -85,7 +85,6 @@ class GenericMask:
             return
 
         if isinstance(m, np.ndarray):  # assumed to be a binary mask
-            print(m.shape)
             assert m.shape[1] != 2, m.shape
             assert m.shape == (
                 height,

@@ -60,12 +60,13 @@ def test_compute_probabilities():
 
 
 async def experiment(
-    num_graph=2,
-    num_task=2,
+    num_graph=5,
+    num_task=5,
 ):
     # selecting highest variation is self-stabilizing (good). 
     tasks = get_high_variation_task(num_task)
     graphs = get_strongest_graph(num_graph)
+    print('Best Score: ', graphs[3].score)
 
     num_graph = len(graphs)
     assert num_graph > 0
@@ -99,8 +100,13 @@ async def experiment(
             print("ERROR")
             print(e)
             print("END ERROR")
-            return (str(e), False)
+            return ('Error: ' + str(e), False)
     res = [[(await handle_error(x)) for x in y] for y in run]
+    for result, graph in zip(res, graphs):
+        if all(x.startswith('Error') for x in result):
+            with Session(_engine) as session:
+                session.delete(graph)
+                session.commit()
     assert res
     assert res[0]
     assert isinstance(res[0], list)
