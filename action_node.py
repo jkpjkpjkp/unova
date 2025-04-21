@@ -1204,7 +1204,7 @@ class ActionNode:
         content = await self.llm.aask(context, images=images)
 
         for field_name in field_names:
-            pattern = rf"<{field_name}>(.*?)</{field_name}>"
+            pattern = rf"<{field_name}>((?:(?!<{field_name}>).)*?)</{field_name}>"
             match = re.search(pattern, content, re.DOTALL)
             if match:
                 raw_value = match.group(1).strip()
@@ -1418,14 +1418,30 @@ class Operator:
 def crop1000(image, box: tuple):
     x, y = image.width, image.height
     return image.crop((box[1] / 1000 * x, box[0] / 1000 * y, box[3] / 1000 * x, box[2] / 1000 * y))
-    
+
+class SuperDict(dict):
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(f"'SuperDict' object has no attribute '{key}'")
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+    def __delattr__(self, key):
+        try:
+            del self[key]
+        except KeyError:
+            raise AttributeError(f"'SuperDict' object has no attribute '{key}'")
 
 class Custom(Operator):
     def __init__(self, llm: LLM = None, name: str = "Custom"):
         super().__init__(llm or LLM(), name)
 
     async def __call__(self, input, pydantic_model=GenerateOp, mode: Literal["single_fill", "xml_fill", "code_fill"] = "single_fill"):
-        return await self._fill_node(pydantic_model, input, mode=mode)
+        ret = await self._fill_node(pydantic_model, input, mode=mode)
+        return SuperDict(ret)
 
 CROP_PROMPT = """We are trying to remove irrelevant information from an image.
 Given a question and its image, please output the bounding box within which the information necessary for answering this question entirely lies.
@@ -1545,9 +1561,6 @@ def area(image) -> int:
     assert a % 255 == 0
     return a // 255
 
-if __name__ == '__main__':
-    test_image_mask_to_alpha()
-
 def alpha_to_mask(image):
     alpha_data = image.getdata(band=3)
     alpha_array = np.array(alpha_data).reshape((image.height, image.width))  # Reshape to (height, width)
@@ -1604,7 +1617,7 @@ def sam2_alpha(image):
     masked_images = list(map(lambda mask: image_mask_to_alpha(image, mask), ret))
     return list(map(alpha_to_mask, masked_images))
 
-def set_of_mask(image):
+async def set_of_mask(image):
     if isinstance(image, list):
         assert isinstance(image[0], Image.Image)
         ret = list(map(alpha_to_mask, image))
@@ -1614,10 +1627,19 @@ def set_of_mask(image):
     ret, _anns = inference_sam_m2m_auto(image=image, outputs=ret)
     return Image.fromarray(ret)
 
+async def test_set_of_mask():
+    from zero import get_task_data
+    image = get_task_data('37_3')['image']
+    ret = await set_of_mask(image)
+    ret.save('test.png')
+
+if __name__ == '__main__':
+    asyncio.run(test_set_of_mask())
+
 operators = {
     'Custom': Custom(),
     'Crop': Crop(),
-    'SAM': sam_operator,
+    # 'SAM': sam_operator,
     'SoM': set_of_mask,
 }
 
@@ -1630,12 +1652,12 @@ operators_doc = {
         'description': "Crops an image to focus on the region relevant to answering a specific question. Returns a cropped PIL Image.",
         'interface': "crop(image: Image.Image, question: str) -> Image.Image"
     },
-    'SAM': {
-        'description': "Segments an image into multiple masks using Segment Anything Model (SAM). Returns list of masked images.",
-        'interface': "sam_operator(image: Image.Image) -> list[Image.Image]"
-    },
+    # 'SAM': {
+    #     'description': "Segments an image into multiple masks using Segment Anything Model (SAM). Returns list of masked images.",
+    #     'interface': "sam_operator(image: Image.Image) -> list[Image.Image]"
+    # },
     'SoM': {
-        'description': "Set of Masks operator that combines SAM with M2M for enhanced segmentation. Returns a single segmentation mask.",
-        'interface': "set_of_mask(image: Image.Image | list[Image.Image]) -> Image.Image"
-    }
+        'description': "Set of Masks operator that segments and marks objects in image. Returns a marked image.",
+        'interface': "set_of_mask(image: Image.Image) -> Image.Image"
+    },
 }

@@ -37,9 +37,31 @@ def compute_probabilities(scores, alpha=0.2, lambda_=0.3):
 
     return mixed_prob
 
+def test_compute_probabilities():
+    scores = [1.0, 2.0, 3.0]
+    probs = compute_probabilities(scores)
+    assert len(probs) == len(scores)
+    assert np.isclose(np.sum(probs), 1.0)
+    assert all(p >= 0 for p in probs)
+    
+    scores = [0.0, 0.0, 0.0]
+    probs = compute_probabilities(scores)
+    assert np.allclose(probs, [1/3, 1/3, 1/3])
+    
+    scores = [-1.0, -2.0, -3.0]
+    probs = compute_probabilities(scores)
+    assert len(probs) == 3
+    assert np.isclose(np.sum(probs), 1.0)
+    
+    scores = [1.0, 2.0]
+    probs = compute_probabilities(scores, alpha=0.5, lambda_=0.1)
+    assert len(probs) == 2
+    assert np.isclose(np.sum(probs), 1.0)
+
+
 async def experiment(
-    num_graph=3,
-    num_task=3,
+    num_graph=2,
+    num_task=2,
 ):
     # selecting highest variation is self-stabilizing (good). 
     tasks = get_high_variation_task(num_task)
@@ -50,6 +72,7 @@ async def experiment(
     assert num_task == len(tasks)
 
     run = []
+    valid_graphs = []
     for i, graph in enumerate(graphs):
         try:
             runnable = graph.run()
@@ -63,11 +86,20 @@ async def experiment(
         for j, task_id in enumerate(tasks):
             graph_runs.append(runnable(get_task_data(task_id)))
         run.append(graph_runs)
+        valid_graphs.append(graph)
+    
+    graph = valid_graphs
     
     assert run, 'all graph corrupted'
+    assert len(graph) == len(run), (graph, run)
     res = [[(await x) for x in y] for y in run]
+    assert res
+    assert res[0]
+    assert isinstance(res[0], list)
     score = [sum(x[1] for x in y) / len(y) for y in res]
-    graph = graphs[np.random.choice(len(graphs), p=compute_probabilities(score))]
+    assert len(graph) == len(score)
+    assert len(graph) == len(compute_probabilities(score))
+    graph = np.random.choice(graphs, p=compute_probabilities(score))
     return graph
 
 
