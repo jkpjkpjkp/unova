@@ -1211,6 +1211,10 @@ class ActionNode:
                 field_type = field_types.get(field_name)
 
                 if field_type == str:
+                    pattern = r"```python(.*?)```"
+                    match = re.search(pattern, raw_value, re.DOTALL)
+                    if match:
+                        raw_value = '\n'.join(match.groups())
                     extracted_data[field_name] = raw_value
                 elif field_type == int:
                     try:

@@ -92,7 +92,15 @@ async def experiment(
     
     assert run, 'all graph corrupted'
     assert len(graph) == len(run), (graph, run)
-    res = [[(await x) for x in y] for y in run]
+    async def handle_error(x):
+        try:
+            return await x
+        except Exception as e:
+            print("ERROR")
+            print(e)
+            print("END ERROR")
+            return (str(e), False)
+    res = [[(await handle_error(x)) for x in y] for y in run]
     assert res
     assert res[0]
     assert isinstance(res[0], list)
