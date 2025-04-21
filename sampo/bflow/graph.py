@@ -3,10 +3,10 @@ from anode import xml_hint, xml_extract
 import inspect
 from typing import Callable
 class Graph:
-    def __init__(self, operators: dict, prompt_custom: dict):
+    def __init__(self, operators: dict, prompts: dict):
         self.custom = operators['Custom']
         self.operators = operators
-        self.prompt_custom = prompt_custom
+        self.prompts = prompts
 
     def _generate_operator_descriptions(self) -> str:
         descriptions = []
@@ -23,7 +23,7 @@ class Graph:
     async def run(self, run: list[Run]) -> Graph_:
         assert len(run) == 1
         run = run[0]
-        prompt = self.prompt_custom['AFLOW'].format(
+        prompt = self.prompts['AFLOW'].format(
             type = 'vqa',
             # experience = self._format_experience(run.experience),
             graph = run.graph.graph,
@@ -32,7 +32,7 @@ class Graph:
             operator_description = self._generate_operator_descriptions(),
             log = run.log,
         )
-        prompt += self.prompt_custom['CUSTOM_USE']
+        prompt += self.prompts['CUSTOM_USE']
         prompt += xml_hint(['graph', 'prompt'])
         response = await self.custom(input=prompt, model='gemini-2.5-pro-exp-03-25')
         data = xml_extract(response, ['graph', 'prompt'], {'graph': str, 'prompt': str})

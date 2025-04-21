@@ -7,7 +7,7 @@ Python's loops (for, while, list comprehensions), conditional statements (if-eli
 or machine learning techniques (e.g., linear regression, decision trees, neural networks, clustering). The graph 
 complexity should not exceed 10. Use logical and control flow (IF-ELSE, loops) for a more enhanced graphical representation.
 Output the modified graph and all the necessary Prompts in prompt.py (if needed).
-The prompt you need to generate is only the one used in `XXX_PROMPT` within Custom. Other methods already have built-in prompts and are prohibited from being generated. Only generate those needed for use in `prompt_custom`; please remove any unused prompts in prompt_custom.
+The prompt you need to generate is only the one used in `XXX_PROMPT` within Custom. Other methods already have built-in prompts and are prohibited from being generated. Only generate those needed for use in `prompts`; please remove any unused prompts in prompts.
 the generated prompt must not contain any placeholders.
 Considering information loss, complex graphs may yield better results, but insufficient information transmission can omit the solution. It's crucial to include necessary context during the process.
 
@@ -25,7 +25,7 @@ Below are the logs of some results with the aforementioned Graph that performed 
 
 First, provide optimization ideas. **Only one detail point can be modified at a time**, and **no more than 5 lines of code may be changed per modification**—extensive modifications are strictly prohibited to maintain project focus!
 Sometimes it is a very good idea to shrink code and remove unnecessary steps. 
-When introducing new functionalities in the graph, please make sure to import the necessary libraries or modules yourself, except for operators and prompt_custom, which have already been automatically imported.
+When introducing new functionalities in the graph, please make sure to import the necessary libraries or modules yourself, except for operators and prompts, which have already been automatically imported.
 **Under no circumstances should Graph.run return None.**
 
 """
@@ -35,7 +35,7 @@ CUSTOM_USE = """
 Here's an example of using the `custom` method in graph:
 ```
 # You can write your own prompt in <prompt>XXX_PROMPT="your_prompt"</prompt> and then use it in the Custom method in the graph
-response = await self.custom(input=problem, instruction=self.prompt_custom.XXX_PROMPT)
+response = await self.custom(input=problem, instruction=self.prompts.XXX_PROMPT)
 # You can also concatenate previously generated multimodal results in the input to provide more comprehensive contextual information.
 # response = await self.custom(input=problem+f"xxx:{xxx}, xxx:{xxx}", instruction=XXX_PROMPT)
 # The output from the Custom method can be placed anywhere you need it, as shown in the example below

@@ -12,9 +12,9 @@ Initial Answer is provided in the input context."""
 
 
 class Graph:
-    def __init__(self, operators: dict, prompt_custom: object):
+    def __init__(self, operators: dict, prompts: object):
         self.custom = operators['Custom']
-        self.prompt_custom = prompt_custom # Contains LOCATE_PROMPT, VQA_PROMPT, REFINE_VQA_PROMPT
+        self.prompts = prompts # Contains LOCATE_PROMPT, VQA_PROMPT, REFINE_VQA_PROMPT
 
     async def run(self, problem: str) -> str:
         """
@@ -24,12 +24,12 @@ class Graph:
         3. Refine the VQA answer, considering estimation for capacity questions.
         """
         # Step 1: Identify relevant area/objects
-        locate_instruction = self.prompt_custom.LOCATE_PROMPT
+        locate_instruction = self.prompts.LOCATE_PROMPT
         location_response_dict = await self.custom(input=problem, instruction=locate_instruction)
         location_description = location_response_dict.get('response', "Could not locate specific area.")
 
         # Step 2: Perform Initial VQA focused on the identified area
-        vqa_instruction = self.prompt_custom.VQA_PROMPT
+        vqa_instruction = self.prompts.VQA_PROMPT
         vqa_input = problem
         focus_desc_text = ""
         if str(location_description).strip() and "Could not locate specific area." not in str(location_description):
@@ -40,7 +40,7 @@ class Graph:
         initial_answer = initial_vqa_dict.get('response', "Initial analysis failed.")
 
         # Step 3: Refine VQA answer, especially for estimation
-        refine_instruction = self.prompt_custom.REFINE_VQA_PROMPT
+        refine_instruction = self.prompts.REFINE_VQA_PROMPT
         # Combine original problem, focus description (if any), and initial answer for refinement context
         refine_input = problem + focus_desc_text + "\n\nInitial Answer:\n" + initial_answer
         final_response_dict = await self.custom(input=refine_input, instruction=refine_instruction)

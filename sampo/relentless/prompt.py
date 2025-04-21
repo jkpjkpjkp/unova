@@ -16,7 +16,7 @@ is a log on how this graph failed to answer the question correctly, which can be
 {log}
 
 First, provide optimization ideas. 
-When introducing new functionalities in the graph, please make sure to import the necessary libraries or modules yourself, except for operators and prompt_custom, which have already been automatically imported.
+When introducing new functionalities in the graph, please make sure to import the necessary libraries or modules yourself, except for operators and prompts, which have already been automatically imported.
 """
 
 
@@ -24,7 +24,7 @@ CUSTOM_USE = """
 Here's an example of using the `custom` method in graph:
 ```
 # You can write your own prompt in <prompt>XXX_PROMPT="your_prompt"</prompt> and then use it in the Custom method in the graph
-response = await self.custom(input=problem, instruction=self.prompt_custom.XXX_PROMPT)
+response = await self.custom(input=problem, instruction=self.prompts.XXX_PROMPT)
 # You can also concatenate previously generated multimodal results in the input to provide more comprehensive contextual information.
 # response = await self.custom(input=problem+f"xxx:{xxx}, xxx:{xxx}", instruction=XXX_PROMPT)
 # The output from the Custom method can be placed anywhere you need it, as shown in the example below
