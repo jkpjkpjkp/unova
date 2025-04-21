@@ -716,7 +716,6 @@ def repair_escape_error(commands):
         It will cause a parsing error.
 
         To repair the wrong JSON string, the following transformations will be used:
-        "\("   --->  "\\\\("
         '\f'   --->  "\\\\f"
         "\)"   --->  "\\\\)"
 
@@ -1441,7 +1440,7 @@ class Crop(Operator):
         bbox = response['bbox']
         ret = crop1000(image, bbox)
         uid = uuid.uuid4()
-        ret.save(f"crop_{uid}.png")
+        ret.save(f"db/crop_{uid}.png")
         return ret
 
 def test_crop():
@@ -1476,7 +1475,7 @@ def show_anns(anns, borders=True):
 
 def call_mask_api(image):
     import uuid
-    image_file = f'{uuid.uuid4()}.png'
+    image_file = f'db/{uuid.uuid4()}.png'
     image.save(image_file)
     server_url = "http://localhost:7861"
     client = Client(server_url)

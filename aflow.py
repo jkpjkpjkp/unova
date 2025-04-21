@@ -90,21 +90,23 @@ class GraphOp(BaseModel):
 
 for round in range(max_rounds):
     graph: Graph = asyncio.run(experiment())
-    runs = filter(lambda x: not x.correct, graph.runs)
-    runs = random.sample(runs, min(3, len(runs)))
-    run_imgs = [run.task[0].thumbnail(764, 764) for run in runs]
+    with Session(_engine) as session:
+        graph = session.get(Graph, graph.id)
+        runs = list(filter(lambda x: not x.correct, graph.runs))
+        runs = random.sample(runs, min(3, len(runs)))
+        run_imgs = [run.task['image'].thumbnail((764, 764)) for run in runs]
 
-    prompt = WORKFLOW_OPTIMIZE_PROMPT + WORKFLOW_INPUT.format(
-        experience = format_experience(graph),
-        score = graph.score,
-        graph = graph.graph,
-        prompt = graph.prompt,
-        operator_description = format_operator_description(operators),
-        log=format_log(runs)
-    )
-    
-    ActionNode.from_pydantic(GraphOp).fill(
-        context=prompt,
-        llm=LLM(model='gemini-2.5-pro-exp-03-25'),
-        mode="xml_fill",
-    )
+        prompt = WORKFLOW_OPTIMIZE_PROMPT + WORKFLOW_INPUT.format(
+            experience = format_experience(graph),
+            score = graph.score,
+            graph = graph.graph,
+            prompt = graph.prompt,
+            operator_description = format_operator_description(operators),
+            log=format_log(runs)
+        )
+        
+        ActionNode.from_pydantic(GraphOp).fill(
+            context=prompt,
+            llm=LLM(model='gemini-2.5-pro-exp-03-25'),
+            mode="xml_fill",
+        )
