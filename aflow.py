@@ -126,8 +126,16 @@ for round in range(max_rounds):
             log=format_log(runs)
         )
         
-        ActionNode.from_pydantic(GraphOp).fill(
+        graph_data = asyncio.run(ActionNode.from_pydantic(GraphOp).fill(
             context=prompt,
             llm=LLM(model='gemini-2.5-pro-exp-03-25'),
             mode="xml_fill",
+        ))
+
+        new_graph = Graph(
+            graph=graph_data['graph'],
+            prompt=graph_data['prompt'],
+            father_id=graph.id,
+            change=graph_data['modification'],
         )
+    put(new_graph)
