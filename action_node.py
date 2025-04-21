@@ -1357,6 +1357,8 @@ class GenerateOp(BaseModel):
 def parse_bbox_string(v: str) -> Tuple[int, int, int, int]:
     if v.startswith('['):
         v = v[1:-1]
+    elif v.startswith('('):
+        v = v[1:-1]
     v = v.replace(',', ' ')
     try:
         numbers = v.split()

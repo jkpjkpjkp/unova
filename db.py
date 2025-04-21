@@ -90,6 +90,9 @@ class Graph(SQLModel, table=True):
                 k: (MyStr(v) if isinstance(v, str) else v) for k, v in namespace.items()
             }
             graph = graph_class(operators=operators, prompts=namespace)
+        except ModuleNotFoundError as e:
+            print(f"ModuleNotFoundError: {e}")
+            raise
         except Exception:
             print("--- Error reading graph code ---")
             print(graph_code)
