@@ -1248,7 +1248,7 @@ class ActionNode:
         for field_name in field_names:
             pattern = rf"<{field_name}>((?:(?!<{field_name}>).)*?)</{field_name}>"
             match = re.search(pattern, content, re.DOTALL)
-            if match:
+            try:
                 raw_value = match.group(1).strip()
                 field_type = field_types.get(field_name)
 
@@ -1259,35 +1259,38 @@ class ActionNode:
                         raw_value = '\n'.join(match.groups())
                     extracted_data[field_name] = raw_value
                 elif field_type == int:
-                    try:
-                        extracted_data[field_name] = int(raw_value)
-                    except ValueError:
-                        extracted_data[field_name] = 0  # 或者其他默认值
+                    extracted_data[field_name] = int(raw_value)
                 elif field_type == bool:
                     extracted_data[field_name] = raw_value.lower() in ("true", "yes", "1", "on", "True")
                 elif field_type == list:
-                    try:
-                        extracted_data[field_name] = eval(raw_value)
-                        if not isinstance(extracted_data[field_name], list):
-                            raise ValueError
-                    except:
-                        extracted_data[field_name] = []  # 默认空列表
+                    extracted_data[field_name] = eval(raw_value)
+                    if not isinstance(extracted_data[field_name], list):
+                        raise ValueError
                 elif field_type == dict:
-                    try:
-                        extracted_data[field_name] = eval(raw_value)
-                        if not isinstance(extracted_data[field_name], dict):
-                            raise ValueError
-                    except:
-                        extracted_data[field_name] = {}  # 默认空字典
+                    extracted_data[field_name] = eval(raw_value)
+                    if not isinstance(extracted_data[field_name], dict):
+                        raise ValueError
                 else:
                     extracted_data[field_name] = raw_value
-            else:
-                pattern = rf"^(.*?)</{field_name}>"
-                match = re.search(pattern, content, re.DOTALL)
-                if match:
+            except:
+                try:
+                    pattern = rf"^(.*?)</{field_name}>"
+                    match = re.search(pattern, content, re.DOTALL)
                     raw_value = match.group(1).strip()
                     extracted_data[field_name] = raw_value
-                else:
+                except:
+                    if field_type == str:
+                        extracted_data[field_name] = ""
+                    elif field_type == int:
+                        extracted_data[field_name] = 0
+                    elif field_type == bool:
+                        extracted_data[field_name] = False
+                    elif field_type == list:
+                        extracted_data[field_name] = []
+                    elif field_type == dict:
+                        extracted_data[field_name] = {}
+                    elif field_type == tuple:
+                        extracted_data[field_name] = ()
                     print(context)
                     print(field_names)
                     print(field_types)
