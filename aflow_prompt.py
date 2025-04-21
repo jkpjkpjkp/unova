@@ -36,11 +36,11 @@ When introducing new functionalities in the graph, please make sure to import th
 WORKFLOW_CUSTOM_USE = """\nHere's an example of using the `custom` method in graph:
 ```
 # You can write your own prompt in <prompt>XXX_PROMPT="your_prompt"</prompt> and then use it in the Custom method in the graph
-response = await self.custom(input=problem, instruction=self.prompt_custom.XXX_PROMPT)
+response = await self.custom(input=problem + self.prompts['XXX_PROMPT'])
 # You can also concatenate previously generated multimodal results in the input to provide more comprehensive contextual information.
 # response = await self.custom(input=problem+f"xxx:{xxx}, xxx:{xxx}", instruction=XXX_PROMPT)
 # The output from the Custom method can be placed anywhere you need it, as shown in the example below
-solution = await self.generate(problem=f"question:{problem}, xxx:{response['response']}")
+solution = await self.custom(input=f"question:{problem}, xxx:{response['response']}")
 ```
 Note: In custom, the input and instruction are directly concatenated(instruction+input), and placeholders are not supported. Please ensure to add comments and handle the concatenation externally.\n
 

@@ -1,17 +1,19 @@
 from db import *
+from db import _engine
 import asyncio
 from zero import get_task_data
 import numpy as np
 import json
 import random
 from pydantic import BaseModel
+from typing import Callable
 
 from aflow_prompt import *
 from action_node import ActionNode, LLM
 
 max_rounds = 25
 
-def compute_probabilities(self, scores, alpha=0.2, lambda_=0.3):
+def compute_probabilities(scores, alpha=0.2, lambda_=0.3):
     scores = np.array(scores, dtype=np.float64)
     n = len(scores)
 
@@ -50,9 +52,10 @@ async def experiment(
     run = [[None for _ in range(num_task)] for _ in range(num_graph)]
     for i, graph in enumerate(graphs):
         for j, task_id in enumerate(tasks):
-            run[i][j] = graph.run()(get_task_data(task_id))
+            runnable = graph.run()
+            assert isinstance(runnable, Callable)
+            run[i][j] = runnable(get_task_data(task_id))
     
-    print(type(run[0][0])) # <class 'function'>
     res = [[(await x) for x in y] for y in run]
     score = [sum(x[1] for x in y) / len(y) for y in res]
     graph = graphs[np.random.choice(len(graphs), p=compute_probabilities(score))]

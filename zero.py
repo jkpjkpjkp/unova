@@ -29,6 +29,22 @@ if __name__ == "__main__":
 
 # print(holy_grail.head())
 
+def merge_images_side_by_side(images):
+    # Calculate total width and maximum height
+    total_width = sum(img.width for img in images)
+    max_height = max(img.height for img in images)
+    
+    # Create a new image with the calculated size and a white background
+    new_img = Image.new('RGB', (total_width, max_height), (255, 255, 255))
+    
+    # Paste each image side by side
+    x = 0
+    for img in images:
+        new_img.paste(img, (x, 0))
+        x += img.width
+    
+    return new_img
+
 def get_task_data(task_id):
     filtered_df = df.filter(pl.col('question_id') == task_id)
     
@@ -36,13 +52,12 @@ def get_task_data(task_id):
 
     row = filtered_df.row(0, named=True)
 
-    images = row['question_images_decoded']
+    images = [Image.open(io.BytesIO(x['bytes'])) for x in row['question_images_decoded']]
     
-    assert len(images) == 1, f"Task ID {task_id} does not have exactly one image."
+    # assert len(images) == 1, f"Task ID {task_id} does not have exactly one image."
     
-    image_data = images[0]['bytes']
-    
-    row['image'] = Image.open(io.BytesIO(image_data))
+    # image_data = images[0]['bytes']
+    row['image'] = merge_images_side_by_side(images)
     row['question'] = row['question_text']
     
     return row

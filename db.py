@@ -44,7 +44,10 @@ class Graph(SQLModel, table=True):
     children_id: list[int] = Field(default=[], sa_column=Column(JSON))
     change: Optional[str] = Field(default=None)
 
-    runs: list["Run"] = Relationship(back_populates="graph")
+    @property
+    def runs(self):
+        with Session(_engine) as session:
+            return session.exec(select(Run).where(Run.graph_id == self.id)).all()
 
     @property
     def father(self):
@@ -122,12 +125,20 @@ class Graph(SQLModel, table=True):
                         final_output=result,
                         correct=correct
                     )
+
+                    assert isinstance(run, Run)
+                    assert isinstance(run.graph_id, int)
+                    assert isinstance(run.task_id, str)
+                    assert isinstance(run.log, dict)
+                    assert all(isinstance(k, str) and isinstance(v, str) for k, v in run.log.items())
+                    assert isinstance(run.final_output, str), run.final_output
+                    assert isinstance(run.correct, bool), run.correct
                     
                     with Session(_engine) as session:
                         session.add(run)
                         session.commit()
                     
-                    return result
+                    return result, correct
                 return wrapper
             return decorator
         
@@ -181,6 +192,10 @@ def get_graph_from_a_folder(folder: str):
         prompt = f.read()
     graph = Graph(graph=graph, prompt=prompt)
     return put(graph)
+
+if __name__ == '__main__':
+    get_graph_from_a_folder('sample/crop')
+    get_graph_from_a_folder('sample/cot')
 
 def test_get_graph_from_a_folder():
     with Session(_engine) as session:

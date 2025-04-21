@@ -20,6 +20,7 @@ from PIL import Image
 from pydantic import BeforeValidator
 from typing_extensions import Annotated
 import uuid
+import matplotlib.pyplot as plt
 
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
@@ -712,7 +713,6 @@ def repair_escape_error(commands):
     Example:
         When the original JSON string is " {"content":"\\\\( \\\\frac{1}{2} \\\\)"} ",
 
-        However, if the original JSON string is " {"content":"\( \frac{1}{2} \)"}" directly.
         It will cause a parsing error.
 
         To repair the wrong JSON string, the following transformations will be used:
@@ -1359,6 +1359,7 @@ class GenerateOp(BaseModel):
 def parse_bbox_string(v: str) -> Tuple[int, int, int, int]:
     if v.startswith('['):
         v = v[1:-1]
+    v = v.replace(',', ' ')
     try:
         numbers = v.split()
         if len(numbers) != 4:
@@ -1451,6 +1452,28 @@ from som import inference_sam_m2m_auto
 import functools
 from gradio_client import Client, handle_file
 
+def show_anns(anns, borders=True):
+    if len(anns) == 0:
+        return
+    sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
+    ax = plt.gca()
+    ax.set_autoscale_on(False)
+
+    img = np.ones((sorted_anns[0]['segmentation'].shape[0], sorted_anns[0]['segmentation'].shape[1], 4))
+    img[:, :, 3] = 0
+    for ann in sorted_anns:
+        m = ann['segmentation']
+        color_mask = np.concatenate([np.random.random(3), [0.5]])
+        img[m] = color_mask
+        if borders:
+            import cv2
+            contours, _ = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            # Try to smooth contours
+            contours = [cv2.approxPolyDP(contour, epsilon=0.01, closed=True) for contour in contours]
+            cv2.drawContours(img, contours, -1, (0, 0, 1, 0.4), thickness=1)
+
+    ax.imshow(img)
+
 def call_mask_api(image):
     import uuid
     image_file = f'{uuid.uuid4()}.png'
@@ -1476,6 +1499,14 @@ def call_mask_api(image):
         }
         masks.append(mask)
     print(f"Reconstructed {len(masks)} masks")
+
+    plt.figure(figsize=(20, 20))
+    plt.imshow(image)
+    show_anns(masks)
+    plt.axis('off')
+    plt.show()
+    plt.savefig(image_file)
+    plt.close()
     return masks
 
 def test_api():
@@ -1488,7 +1519,6 @@ def image_mask_to_alpha(image, mask):
     masked = image.copy()
     alpha_mask = Image.fromarray(mask['segmentation'].astype('uint8') * 255, mode='L')  # size becomes (width, height)
     print(mask['segmentation'] * 255)
-    alpha_mask.show()
     # assert alpha_mask.getpixel((np.where(mask['segmentation'])[1][0], np.where(mask['segmentation'])[0][0])) == 255, alpha_mask.getpixel((np.where(mask['segmentation'])[1][0], np.where(mask['segmentation'])[0][0]))
     masked.putalpha(alpha_mask)
     assert masked.getbbox()
@@ -1580,8 +1610,8 @@ def set_of_mask(image):
         image = combine(image)
     elif isinstance(image, Image.Image):
         ret = call_mask_api(image)
-    return inference_sam_m2m_auto(image=image, outputs=ret)
-
+    ret, _anns = inference_sam_m2m_auto(image=image, outputs=ret)
+    return Image.fromarray(ret)
 
 operators = {
     'Custom': Custom(),
