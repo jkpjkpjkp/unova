@@ -7,5 +7,5 @@ class Graph:
     
     async def run(self, question: tuple[Image.Image, str]) -> str:
         image = await self.crop(*question)
-        response = await self.custom(input=(image, question[1], self.prompts['COT']))
+        response = await self.custom(input=self.prompts['COT'].format(image=image, question=question[1]))
         return response['response']

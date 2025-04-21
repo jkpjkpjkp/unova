@@ -24,6 +24,7 @@ Here is a graph and the corresponding prompt (prompt only related to the custom 
     <prompt>{prompt}</prompt>
     <operator_description>{operator_description}</operator_description>
 </sample>
+we use a custom subclass of str so str.format can take in Image.Image as well as str. 
 Below are the logs of some results with the aforementioned Graph that performed well but encountered errors, which can be used as references for optimization:
 {log}
 
