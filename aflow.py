@@ -89,10 +89,10 @@ async def experiment(
         run.append(graph_runs)
         valid_graphs.append(graph)
     
-    graph = valid_graphs
+    graphs = valid_graphs
     
     assert run, 'all graph corrupted'
-    assert len(graph) == len(run), (graph, run)
+    assert len(graphs) == len(run), (graphs, run)
     async def handle_error(x):
         try:
             return await x
@@ -103,7 +103,7 @@ async def experiment(
             return ('Error: ' + str(e), False)
     res = [[(await handle_error(x)) for x in y] for y in run]
     for result, graph in zip(res, graphs):
-        if all(x.startswith('Error') for x in result):
+        if all(x[0].startswith('Error') for x in result):
             with Session(_engine) as session:
                 session.delete(graph)
                 session.commit()
@@ -111,8 +111,8 @@ async def experiment(
     assert res[0]
     assert isinstance(res[0], list)
     score = [sum(x[1] for x in y) / len(y) for y in res]
-    assert len(graph) == len(score)
-    assert len(graph) == len(compute_probabilities(score))
+    assert len(graphs) == len(score)
+    assert len(graphs) == len(compute_probabilities(score))
     graph = np.random.choice(graphs, p=compute_probabilities(score))
     return graph
 

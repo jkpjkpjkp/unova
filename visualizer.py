@@ -144,8 +144,6 @@ class GenericMask:
         return self.mask.sum()
 
     def bbox(self):
-        print(self.polygons)
-        print(self.height, self.width)
         p = mask_util.frPyObjects(self.polygons, self.height, self.width)
         p = mask_util.merge(p)
         bbox = mask_util.toBbox(p)

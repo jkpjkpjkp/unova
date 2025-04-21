@@ -24,6 +24,46 @@ import matplotlib.pyplot as plt
 import numpy as np
 from visualizer import Visualizer
 
+def call_vllm(image: Image.Image, text: str):
+    import requests
+    import base64
+    from io import BytesIO
+
+    # Convert PIL Image to base64
+    buffered = BytesIO()
+    image.save(buffered, format="JPEG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+    # Prepare the API request
+    url = "http://localhost:8000/v1/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": "/root/gemma/LLM-Research/gemma-3-4b-it",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": text
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{img_base64}"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    # Make the API call
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()  # Raise an exception for HTTP errors
+    
+    return response.json()['choices'][0]['message']['content']
+
 class LLM:
     def __init__(self, model='gemini-2.0-flash') -> None:
         self.model = model
@@ -1242,9 +1282,15 @@ class ActionNode:
                 else:
                     extracted_data[field_name] = raw_value
             else:
-                print(context)
-                print(field_names)
-                print(field_types)
+                pattern = rf"^(.*?)</{field_name}>"
+                match = re.search(pattern, content, re.DOTALL)
+                if match:
+                    raw_value = match.group(1).strip()
+                    extracted_data[field_name] = raw_value
+                else:
+                    print(context)
+                    print(field_names)
+                    print(field_types)
 
         return extracted_data
 
@@ -1446,7 +1492,7 @@ class Custom(Operator):
         super().__init__(llm or LLM(), name)
 
     async def __call__(self, input, pydantic_model=GenerateOp, mode: Literal["single_fill", "xml_fill", "code_fill"] = "single_fill"):
-        ret = await self._fill_node(pydantic_model, input, mode=mode)
+        ret = await self._fill_node(pydantic_model, input, mode="single_fill" if pydantic_model == GenerateOp else "xml_fill")
         return SuperDict(ret)
 
 CROP_PROMPT = """We are trying to remove irrelevant information from an image.
@@ -1505,6 +1551,7 @@ def call_mask_api(image):
     client = Client(server_url)
     filename = client.predict(image=handle_file(image_file), api_name="/predict")
 
+    print(filename)
     data = np.load(filename)
     segmentations = data['segmentations']
     areas = data['areas']
@@ -1669,8 +1716,8 @@ async def test_set_of_mask():
     ret = await set_of_mask_with_number(image)
     ret.save('test.png')
 
-if __name__ == '__main__':
-    asyncio.run(test_set_of_mask())
+# if __name__ == '__main__':
+#     test_set_of_mask()
 
 operators = {
     'Custom': Custom(),
@@ -1697,3 +1744,49 @@ operators_doc = {
         'interface': "set_of_mask(image: Image.Image) -> Image.Image"
     },
 }
+
+async def segment_and_caption(image: Image.Image):
+    # Get SAM masks
+    masks = call_mask_api(image)
+    
+    # Sort masks by area (largest first) and take top 10
+    sorted_masks = sorted(masks, key=lambda x: x['area'], reverse=True)[:10]
+    
+    results = []
+    for idx, mask in enumerate(sorted_masks, 1):
+        # Create masked image
+        masked_img = image_mask_to_alpha(image, mask)
+        
+        # Get bounding box and crop
+        bbox = mask['bbox']
+        x1, y1, x2, y2 = map(int, bbox)
+        cropped = masked_img.crop((x1, y1, x2, y2))
+        
+        # Get caption from vLLM
+        caption = call_vllm(cropped, "What do you see in this image? Describe it briefly and concisely.")
+        
+        results.append({
+            'mask_id': idx,
+            'area': mask['area'],
+            'bbox': bbox,
+            'caption': caption
+        })
+    
+    return results
+
+if __name__ == '__main__':
+    from zero import get_task_data
+    
+    # Get test image
+    task = get_task_data('37_3')
+    image = task['image']
+    
+    # Run segmentation and captioning
+    results = asyncio.run(segment_and_caption(image))
+    
+    # Print results
+    for result in results:
+        print(f"\nMask {result['mask_id']}:")
+        print(f"Area: {result['area']:.0f}")
+        print(f"BBox: {result['bbox']}")
+        print(f"Caption: {result['caption']}")
