@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing import Callable
 
 from aflow_prompt import *
-from action_node import ActionNode, LLM
+from action_node import ActionNode, LLM, operators_doc
 
 max_rounds = 25
 
@@ -86,8 +86,21 @@ def format_operator_description(operators_doc):
     return '\n'.join(descriptions)
 
 def format_log(data):
+    def clean_dict(d):
+        if isinstance(d, dict):
+            return {k: clean_dict(v) for k, v in d.items() if not isinstance(v, bytes)}
+        elif isinstance(d, (list, tuple)):
+            return [clean_dict(x) for x in d if not isinstance(x, bytes)]
+        elif isinstance(d, Image.Image):
+            return f"<Image size={d.size} mode={d.mode}>"
+        return d
     log = ""
-    for sample in data:
+    for run in data:
+        sample = {
+            "log": clean_dict(run.log),
+            "final_output": run.final_output,
+            "task": clean_dict(run.task)  # This should work since get_task_data() returns a dict
+        }
         log += json.dumps(sample, indent=4, ensure_ascii=False) + "\n\n"
     return log
 
@@ -109,7 +122,7 @@ for round in range(max_rounds):
             score = graph.score,
             graph = graph.graph,
             prompt = graph.prompt,
-            operator_description = format_operator_description(operators),
+            operator_description = format_operator_description(operators_doc),
             log=format_log(runs)
         )
         

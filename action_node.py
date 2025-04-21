@@ -717,7 +717,6 @@ def repair_escape_error(commands):
 
         To repair the wrong JSON string, the following transformations will be used:
         '\f'   --->  "\\\\f"
-        "\)"   --->  "\\\\)"
 
     """
     escape_repair_map = {
@@ -1371,7 +1370,7 @@ BBoxType = Annotated[Tuple[int, int, int, int], BeforeValidator(parse_bbox_strin
 
 class CropOp(BaseModel):
     thought: str = Field(default="", description="Thoughts on what crop may be sufficient.")
-    bbox: BBoxType = Field(..., description="a crop containing all relevant information, in x y x y format, idx from 0 to 1000")
+    bbox: BBoxType = Field(..., description="a crop containing all relevant information, in x y x y format, idx from 0 to 1000. ")
 
 
 def custom(input, model='gemini-2.0-flash', dna=GenerateOp):
@@ -1430,6 +1429,7 @@ CROP_PROMPT = """We are trying to remove irrelevant information from an image.
 Given a question and its image, please output the bounding box within which the information necessary for answering this question entirely lies.
 
 question: {question}
+be sure to include coordinates of a bbox in your response. 
 """
 class Crop(Operator):
     def __init__(self, llm: LLM = None, name: str = "Crop"):
