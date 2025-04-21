@@ -1616,8 +1616,8 @@ def set_of_mask(image):
 operators = {
     'Custom': Custom(),
     'Crop': Crop(),
-    'SAM': sam_operator,
-    'SoM': set_of_mask,
+    # 'SAM': sam_operator,
+    # 'SoM': set_of_mask,
 }
 
 operators_doc = {

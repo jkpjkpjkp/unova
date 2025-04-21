@@ -43,11 +43,15 @@ class Graph(SQLModel, table=True):
     father_id: Optional[int] = Field(default=None)
     children_id: list[int] = Field(default=[], sa_column=Column(JSON))
     change: Optional[str] = Field(default=None)
+    runs: list["Run"] = Relationship(back_populates="graph")
 
-    @property
-    def runs(self):
-        with Session(_engine) as session:
-            return session.exec(select(Run).where(Run.graph_id == self.id)).all()
+    @classmethod
+    def from_folder(cls, foldername):
+        with open(os.path.join(foldername, "graph.py"), "r") as f:
+            graph = f.read()
+        with open(os.path.join(foldername, "prompt.py"), "r") as f:
+            prompt = f.read()
+        return cls(graph=graph, prompt=prompt)
 
     @property
     def father(self):
@@ -61,14 +65,6 @@ class Graph(SQLModel, table=True):
         with Session(_engine) as session:
             return [session.get(Graph, id) for id in self.children_id]
 
-
-    @classmethod
-    def read(foldername):
-        with open(os.path.join(foldername, "graph.py"), "r") as f:
-            graph = f.read()
-        with open(os.path.join(foldername, "prompt.py"), "r") as f:
-            prompt = f.read()
-        return Graph(graph=graph, prompt=prompt)
     def run(self):
         graph_code = self.graph + '\n' + self.prompt
         namespace = {'__name__': '__exec__', '__package__': None}
@@ -150,7 +146,6 @@ class Run(SQLModel, table=True):
     log: Dict[str, Any] = Field(sa_column=Column(JSON))
     final_output: str | None = Field(default=None)
     correct: bool
-
     graph: Graph = Relationship(back_populates="runs")
 
     @property

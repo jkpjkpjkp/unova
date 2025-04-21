@@ -81,7 +81,7 @@ def get_graph_executable(graph_code: str, prompt_code: str):
         print("--- End graph code ---")
         raise
     Graph = namespace.get("Graph")
-    graph = Graph(operators=operators_dict, prompt_custom=namespace)
+    graph = Graph(operators=operators_dict, prompts=namespace)
     return extract_local_variables(graph.run)
 
 def extract_brace(x: str):
